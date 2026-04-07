@@ -1,0 +1,41 @@
+#!/bin/sh
+
+echo "Starting pre-commit checks..."
+echo "Checking staged files..."
+
+# 1. Prevent committing .env files
+echo "Check 1: scanning for .env files..."
+if git diff --cached --name-only | grep -qE '(^|/)\.env($|\.|/)'; then
+  echo "FAILED: .env file detected in staged changes."
+  echo "Action: remove it with 'git reset <file>' and add it to .gitignore."
+  exit 1
+else
+  echo "Passed: no .env files detected."
+fi
+
+# 2. Prevent committing node_modules
+echo "Check 2: scanning for node_modules..."
+if git diff --cached --name-only | grep -q "node_modules"; then
+  echo "FAILED: node_modules detected in staged changes."
+  echo "Action: remove it with 'git reset <file>' and ensure it is in .gitignore."
+  exit 1
+else
+  echo "Passed: no node_modules detected."
+fi
+
+# 3. Run lint if it exists
+echo "Check 3: running lint (if configured)..."
+if npm run | grep -q "lint"; then
+  npm run lint
+  if [ $? -ne 0 ]; then
+    echo "FAILED: lint errors detected."
+    echo "Action: fix lint issues before committing."
+    exit 1
+  else
+    echo "Passed: lint successful."
+  fi
+else
+  echo "Skipped: no lint script found."
+fi
+
+echo "All pre-commit checks passed. Proceeding with commit."

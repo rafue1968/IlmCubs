@@ -1,0 +1,87 @@
+"use client";
+
+import Link from "next/link";
+import { Menu } from "lucide-react";
+import { useState } from "react";
+
+const navLinks = [
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Features", href: "#features" },
+  { label: "Pathways", href: "#pathways" },
+  { label: "For Who", href: "#audience" },
+];
+
+export default function Header() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 ring-1 ring-emerald-400/30">
+            <span className="text-lg font-bold text-emerald-400">Q</span>
+          </div>
+          <div>
+            <p className="text-sm font-semibold tracking-wide text-white">Quran Journey</p>
+            <p className="text-xs text-slate-400">Grow daily with the Quran</p>
+          </div>
+        </Link>
+
+        <nav className="hidden items-center gap-8 md:flex">
+          {navLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              className="text-sm text-slate-300 transition hover:text-white"
+            >
+              {link.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="hidden md:block">
+          <a
+            href="#cta"
+            className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+          >
+            Start Your Journey
+          </a>
+        </div>
+
+        <button
+          type="button"
+          aria-label="Toggle menu"
+          onClick={() => setOpen((prev) => !prev)}
+          className="rounded-xl border border-white/10 p-2 text-slate-200 md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+      </div>
+
+      {open && (
+        <div className="border-t border-white/10 bg-slate-950 md:hidden">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm text-slate-300 transition hover:text-white"
+                onClick={() => setOpen(false)}
+              >
+                {link.label}
+              </a>
+            ))}
+
+            <a
+              href="#cta"
+              className="mt-2 inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+              onClick={() => setOpen(false)}
+            >
+              Start Your Journey
+            </a>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}

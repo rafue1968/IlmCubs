@@ -3,11 +3,26 @@
 echo "Starting pre-commit checks..."
 echo "Checking staged files..."
 
+# Get staged files once for messaging (safe to reuse for display)
+FILES=$(git diff --cached --name-only)
+
 # 1. Prevent committing .env files
 echo "Check 1: scanning for .env files..."
-if git diff --cached --name-only | grep -qE '(^|/)\.env($|\.|/)'; then
-  echo "FAILED: .env file detected in staged changes."
-  echo "Action: remove it with 'git reset <file>' and add it to .gitignore."
+ENV_FILES=$(echo "$FILES" | grep -E '(^|/)\.env($|\.|/)' || true)
+
+if [ -n "$ENV_FILES" ]; then
+  echo "FAILED: .env file(s) detected in staged changes:"
+  echo "$ENV_FILES"
+  echo ""
+  echo "Why this matters:"
+  echo "- .env files often contain secrets (API keys, credentials)"
+  echo ""
+  echo "How to fix:"
+  echo "1. Unstage the file(s):"
+  echo "   git reset $ENV_FILES"
+  echo "2. Add to .gitignore if not already:"
+  echo "   echo '.env' >> .gitignore"
+  echo ""
   exit 1
 else
   echo "Passed: no .env files detected."
@@ -15,9 +30,20 @@ fi
 
 # 2. Prevent committing node_modules
 echo "Check 2: scanning for node_modules..."
-if git diff --cached --name-only | grep -q "node_modules"; then
-  echo "FAILED: node_modules detected in staged changes."
-  echo "Action: remove it with 'git reset <file>' and ensure it is in .gitignore."
+NODE_MODULE_FILES=$(echo "$FILES" | grep "node_modules" || true)
+
+if [ -n "$NODE_MODULE_FILES" ]; then
+  echo "FAILED: node_modules detected in staged changes:"
+  echo "$NODE_MODULE_FILES"
+  echo ""
+  echo "Why this matters:"
+  echo "- node_modules is large and should not be version controlled"
+  echo ""
+  echo "How to fix:"
+  echo "1. Unstage the file(s):"
+  echo "   git reset $NODE_MODULE_FILES"
+  echo "2. Ensure node_modules is in .gitignore"
+  echo ""
   exit 1
 else
   echo "Passed: no node_modules detected."
@@ -29,7 +55,11 @@ if npm run | grep -q "lint"; then
   npm run lint
   if [ $? -ne 0 ]; then
     echo "FAILED: lint errors detected."
-    echo "Action: fix lint issues before committing."
+    echo ""
+    echo "How to fix:"
+    echo "- Run 'npm run lint' locally to see issues"
+    echo "- Fix the reported errors before committing"
+    echo ""
     exit 1
   else
     echo "Passed: lint successful."

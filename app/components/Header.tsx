@@ -39,13 +39,19 @@ export default function Header() {
           ))}
         </nav>
 
-        <div className="hidden md:block">
-          <a
-            href="#cta"
+        <div className="hidden items-center gap-3 md:flex">
+          <Link
+            href="/login"
+            className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/register"
             className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
           >
-            Start Your Journey
-          </a>
+            Create account
+          </Link>
         </div>
 
         <button
@@ -72,13 +78,20 @@ export default function Header() {
               </a>
             ))}
 
-            <a
-              href="#cta"
-              className="mt-2 inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+            <Link
+              href="/login"
+              className="mt-2 inline-flex w-fit rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
               onClick={() => setOpen(false)}
             >
-              Start Your Journey
-            </a>
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+              onClick={() => setOpen(false)}
+            >
+              Create account
+            </Link>
           </div>
         </div>
       )}

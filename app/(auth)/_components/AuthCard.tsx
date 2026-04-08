@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { loginWithEmail, registerWithEmail } from "../../lib/authClient";
 
@@ -12,6 +13,7 @@ function validateEmail(value: string) {
 
 export default function AuthCard({ mode }: { mode: Mode }) {
   const isRegister = mode === "register";
+  const router = useRouter();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -50,14 +52,13 @@ export default function AuthCard({ mode }: { mode: Mode }) {
           password,
           displayName: name.trim(),
         });
+        router.push("/login");
       } else {
         await loginWithEmail({ email, password });
+        router.push("/");
       }
-      setMessage(
-        isRegister
-          ? "Account created (demo). This is ready to be swapped to Firebase Auth."
-          : "Signed in (demo). This is ready to be swapped to Firebase Auth."
-      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
       setSubmitting(false);
     }

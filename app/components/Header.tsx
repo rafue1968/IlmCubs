@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "../providers/AuthProvider";
 
 const navLinks = [
   { label: "How It Works", href: "#how-it-works" },
@@ -13,6 +15,8 @@ const navLinks = [
 
 export default function Header() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const { user, loading, signOut } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl">
@@ -40,18 +44,41 @@ export default function Header() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/login"
-            className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/register"
-            className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
-          >
-            Create account
-          </Link>
+          {!loading && user ? (
+            <>
+              <span className="hidden max-w-[220px] truncate text-sm text-slate-300 lg:inline">
+                Signed in as{" "}
+                <span className="font-medium text-white">
+                  {user.displayName || user.email}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  await signOut();
+                  router.push("/");
+                }}
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+              >
+                Create account
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -78,20 +105,44 @@ export default function Header() {
               </a>
             ))}
 
-            <Link
-              href="/login"
-              className="mt-2 inline-flex w-fit rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-              onClick={() => setOpen(false)}
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
-              onClick={() => setOpen(false)}
-            >
-              Create account
-            </Link>
+            {!loading && user ? (
+              <>
+                <p className="mt-2 text-sm text-slate-300">
+                  Signed in as{" "}
+                  <span className="font-medium text-white">
+                    {user.displayName || user.email}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  className="inline-flex w-fit rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  onClick={async () => {
+                    await signOut();
+                    setOpen(false);
+                    router.push("/");
+                  }}
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="mt-2 inline-flex w-fit rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
+                  onClick={() => setOpen(false)}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+                  onClick={() => setOpen(false)}
+                >
+                  Create account
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

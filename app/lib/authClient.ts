@@ -4,39 +4,87 @@ export type AuthUser = {
   displayName?: string | null;
 };
 
-function makeDemoUser(params: { email: string; displayName?: string }) {
-  return {
-    uid: `demo_${Math.random().toString(16).slice(2)}`,
-    email: params.email,
-    displayName: params.displayName ?? null,
-  } satisfies AuthUser;
-}
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
 
-/**
- * Client-side auth adapter.
- *
- * For now this is a mock that matches the Firebase Auth shape we’ll use later.
- * When you’re ready, swap the internals to `firebase/auth` without changing UI code.
- */
+import { firebaseAuth } from "./firebaseClient";
+
 export async function registerWithEmail(params: {
   email: string;
   password: string;
   displayName?: string;
 }): Promise<{ user: AuthUser }> {
-  // Placeholder for Firebase:
-  // - createUserWithEmailAndPassword(auth, email, password)
-  // - updateProfile(user, { displayName })
-  await new Promise((r) => setTimeout(r, 650));
-  return { user: makeDemoUser({ email: params.email, displayName: params.displayName }) };
+  try {
+    const cred = await createUserWithEmailAndPassword(
+      firebaseAuth,
+      params.email,
+      params.password
+    );
+
+    if (params.displayName?.trim()) {
+      await updateProfile(cred.user, { displayName: params.displayName.trim() });
+    }
+
+    return {
+      user: {
+        uid: cred.user.uid,
+        email: cred.user.email ?? params.email,
+        displayName: cred.user.displayName,
+      },
+    };
+  } catch (err) {
+    throw new Error(getFriendlyAuthErrorMessage(err));
+  }
 }
 
 export async function loginWithEmail(params: {
   email: string;
   password: string;
 }): Promise<{ user: AuthUser }> {
-  // Placeholder for Firebase:
-  // - signInWithEmailAndPassword(auth, email, password)
-  await new Promise((r) => setTimeout(r, 650));
-  return { user: makeDemoUser({ email: params.email }) };
+  try {
+    const cred = await signInWithEmailAndPassword(
+      firebaseAuth,
+      params.email,
+      params.password
+    );
+    return {
+      user: {
+        uid: cred.user.uid,
+        email: cred.user.email ?? params.email,
+        displayName: cred.user.displayName,
+      },
+    };
+  } catch (err) {
+    throw new Error(getFriendlyAuthErrorMessage(err));
+  }
+}
+
+function getFriendlyAuthErrorMessage(err: unknown) {
+  const code =
+    typeof err === "object" && err && "code" in err
+      ? String((err as { code?: unknown }).code)
+      : "";
+
+  switch (code) {
+    case "auth/email-already-in-use":
+      return "That email is already in use. Try signing in instead.";
+    case "auth/invalid-email":
+      return "That email address is invalid.";
+    case "auth/weak-password":
+      return "Password is too weak. Use at least 8 characters.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "Incorrect email or password.";
+    case "auth/network-request-failed":
+      return "Network error. Check your connection and try again.";
+    case "auth/operation-not-allowed":
+      return "Email/password sign-in is disabled in Firebase for this project.";
+    default:
+      return "Authentication failed. Please try again.";
+  }
 }
 

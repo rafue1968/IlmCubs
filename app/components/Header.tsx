@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useAuth } from "../providers/AuthProvider";
 
 const navLinks = [
+  { label: "Quizzes", href: "/quizzes" },
   { label: "How It Works", href: "#how-it-works" },
   { label: "Features", href: "#features" },
   { label: "Pathways", href: "#pathways" },
@@ -33,13 +34,23 @@ export default function Header() {
 
         <nav className="hidden items-center gap-8 md:flex">
           {navLinks.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="text-sm text-slate-300 transition hover:text-white"
-            >
-              {link.label}
-            </a>
+            link.href.startsWith("/") ? (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm text-slate-300 transition hover:text-white"
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-sm text-slate-300 transition hover:text-white"
+              >
+                {link.label}
+              </a>
+            )
           ))}
         </nav>
 
@@ -95,14 +106,25 @@ export default function Header() {
         <div className="border-t border-white/10 bg-slate-950 md:hidden">
           <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5">
             {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className="text-sm text-slate-300 transition hover:text-white"
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </a>
+              link.href.startsWith("/") ? (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-slate-300 transition hover:text-white"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-slate-300 transition hover:text-white"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </a>
+              )
             ))}
 
             {!loading && user ? (

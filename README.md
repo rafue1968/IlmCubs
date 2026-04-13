@@ -1,87 +1,80 @@
-# Quran Companion AI
+# IlmCubs
 
-A modern AI-powered Quran companion that connects real-life emotions with meaningful Quranic guidance.
+A gamified, child-friendly Quran-based quiz application designed to help children aged 4–6 fall in love with the Quran through visual, interactive, and fun experiences.
 
-## Problem Statement
+## Problem
 
-Many people want a deeper, consistent relationship with the Quran, but struggle to find relevant verses during everyday emotional moments. Existing tools often feel distant and are not tailored to personal feelings or context.
+Young children need engaging, age-appropriate ways to connect with the Quran early in life. Traditional learning methods can feel overwhelming or disconnected, making it challenging to build a foundation of faith (Imaan), good character (Ihsaan), and knowledge (Ilm) in a way that's joyful and memorable.
 
-## Solution Overview
+## Solution
 
-Quran Companion AI bridges emotion and scripture by letting users describe how they feel or what they are going through. The app then uses Quran APIs and generative AI to provide relevant ayahs, simple explanations, and reflection prompts that support long-term spiritual growth.
+IlmCubs transforms Quran learning into an exciting adventure for little ones. Through story-based narratives, visual quizzes, and gamified rewards, children explore Quranic values through simple moral choices and interactive challenges. The app emphasizes fun over text, helping kids develop a lifelong love for the Quran while tracking their progress and celebrating their achievements.
 
 ## Features
 
-- ✨ AI-powered personalized Quran guidance
-- 📝 Emotion and situation input with text and mood buttons
-- 📖 Relevant ayah retrieval using Quran Foundation content APIs
-- 🤖 Simple explanation generation with Gemini API
-- 📔 Reflection journaling for personal insight and growth
-- 🔖 Bookmark and save ayahs for later
-- 📈 Streak tracking for habit building
-- 🔊 Optional audio playback for selected verses
+- 📚 **StoryTime Mode**: Immersive stories that introduce Quranic themes and characters in an engaging, narrative format
+- 🎯 **Visual Quiz Interactions**: Choose-the-correct-good-action quizzes with colorful, intuitive interfaces
+- ⭐ **Gamified Rewards**: Earn stars, positive feedback, and unlockable content for completing activities
+- 📊 **Progress Tracking**: Streak counters and completion badges to motivate consistent engagement
+- 🤝 **Good Deed Challenges**: Post-activity prompts encouraging real-world application of learned values
+- 📖 **Quran API Integration**: Seamless access to verses, translations, and tafsir through Quran Foundation APIs
+- 🎨 **Child-Friendly UI**: Minimal text, vibrant colors, and simple navigation designed for young users
 
 ## How It Works
 
-1. User enters their current emotion or situation.
-2. The app classifies the input and maps it to relevant Quranic themes.
-3. Quran Foundation Content APIs retrieve matching ayahs.
-4. Gemini API generates a simple explanation and reflection prompt.
-5. The user can read, bookmark, journal, or listen to the verse.
-6. Streak tracking rewards consistent engagement.
+1. **Choose a Story**: Kids select from themed stories that align with Quranic lessons and values.
+2. **Engage in Quizzes**: Interactive visual challenges present simple moral dilemmas or knowledge checks.
+3. **Earn Rewards**: Successful choices unlock stars, feedback, and progress toward streaks.
+4. **Complete Challenges**: After each activity, kids are prompted to perform a good deed in real life.
+5. **Track Progress**: The app monitors streaks and completion, providing a sense of accomplishment and motivation.
 
 ## Tech Stack
 
-- Next.js (App Router)
-- TypeScript
-- Tailwind CSS
-- Gemini API (Google Generative AI)
-- Quran Foundation APIs (content + user APIs)
+- **Frontend Framework**: Next.js (App Router) with TypeScript for robust, scalable development
+- **Styling**: Tailwind CSS for responsive, child-friendly designs
+- **APIs**: Quran Foundation Content and User APIs for Quran data and progress tracking
+- **Internal Routing**: Custom API routes (e.g., `/api/content/verse`, `/api/content/juz`) for efficient data handling
 
 ## API Usage
 
 ### Content APIs
-- Verse lookup and retrieval
-- Search by theme, mood, or situation
-- Ayah metadata and translations
-- Audio playback links
+- Retrieve verses, juz, tafsir, and translations for story mapping and quiz content
+- Search functionality for thematic content alignment
+- Audio and metadata support for enhanced learning experiences
 
 ### User APIs
-- User authentication and profiles
-- Saved bookmarks and journal entries
-- Streak and engagement tracking
-- Personal preference settings
+- Progress tracking and streak management for personalized engagement
+- User profiles and achievement storage (planned for future expansion)
 
 ## Setup Instructions
 
 ### Installation
 1. Clone the repository
-2. Install dependencies
-    - `npm install`
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
 ### Environment Variables
-Create a `.env` file with required keys:
-- `NEXT_PUBLIC_GEMINI_API_KEY`
-- `NEXT_PUBLIC_QURAN_API_URL`
-- `NEXT_PUBLIC_QURAN_USER_API_URL`
-- `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
+Create a `.env.local` file with the following keys:
+- `NEXT_PUBLIC_QURAN_API_URL` (Quran Foundation Content API)
+- `NEXT_PUBLIC_QURAN_USER_API_URL` (Quran Foundation User API)
+- `NEXTAUTH_URL` (for authentication, if applicable)
+- `NEXTAUTH_SECRET` (for authentication, if applicable)
 
 ### Running Locally
 - Start the development server:
-  - `npm run dev`
-
-## Demo Section
-
-> Demo content coming soon. Replace this placeholder with a live demo link or video once available.
+  ```bash
+  npm run dev
+  ```
 
 ## Future Improvements
 
-- Add offline support for saved ayahs and notes
-- Enhance mood detection with richer emotion categories
-- Introduce AI-driven daily Quran reflections
-- Add multilingual support for translation and explanation
-- Improve audio playback experience with reciter selection
+- Expand story themes and surah coverage for broader Quranic exploration
+- Introduce multiplayer family challenges to involve parents and siblings
+- Add customizable avatars and reward systems for deeper personalization
+- Implement offline mode for stories and quizzes
+- Enhance accessibility features for diverse learning needs
 
 ## Team Section
 
@@ -89,5 +82,5 @@ Create a `.env` file with required keys:
 
 ## Hackathon Attribution
 
-Quran Companion AI  
+IlmCubs  
 Quran Foundation Hackathon 2026

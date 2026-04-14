@@ -1,15 +1,52 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
 
-const CLIENT_ID = getEnv("QURAN_CLIENT_ID");
-const BASE_URL = getEnv("QURAN_OAUTH_BASE_URL");
-const REDIRECT_URI = "http://localhost:3000/api/auth/callback";
+type LoginUrlRequest = {
+  codeChallenge?: string;
+  state?: string;
+  redirectUri?: string;
+};
 
-export async function GET() {
-  const url = new URL(`${BASE_URL}/authorize`);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("client_id", CLIENT_ID);
-  url.searchParams.set("redirect_uri", REDIRECT_URI);
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json()) as LoginUrlRequest;
 
-  return NextResponse.redirect(url);
+    if (!body.codeChallenge || !body.state || !body.redirectUri) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Missing codeChallenge, state, or redirectUri",
+        },
+        { status: 400 }
+      );
+    }
+
+    const clientId = getEnv("QURAN_CLIENT_ID");
+    const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
+
+    const url = new URL(`${baseUrl}/oauth2/auth`);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("redirect_uri", body.redirectUri);
+    url.searchParams.set("code_challenge", body.codeChallenge);
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("state", body.state);
+
+    // Request only the scopes you actually need.
+    url.searchParams.set("scope", "openid offline_access streak user");
+
+    return NextResponse.json({
+      success: true,
+      url: url.toString(),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to build login URL",
+      },
+      { status: 500 }
+    );
+  }
 }

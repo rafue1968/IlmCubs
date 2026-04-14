@@ -1,30 +1,52 @@
-import Link from "next/link";
+import { NextResponse } from "next/server";
+import { getEnv } from "@/app/lib/env";
 
-export const metadata = {
-  title: "Callback | Quran Journey",
-  description: "Callback route for sign-in redirects and authentication flow.",
+type LoginUrlRequest = {
+  codeChallenge?: string;
+  state?: string;
+  redirectUri?: string;
 };
 
-export default function CallbackPage() {
-  return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <div className="mx-auto max-w-4xl px-6 py-20 lg:px-8">
-        <h1 className="text-4xl font-bold text-white sm:text-5xl">Callback</h1>
-        <p className="mt-6 text-slate-300 leading-8">
-          This page is used to complete authentication redirects or other callback flows. If you were redirected here after signing in, the app is finalizing the process.
-        </p>
-        <div className="mt-10 rounded-3xl border border-white/10 bg-slate-900/80 p-8">
-          <p className="text-slate-300 leading-7">
-            If the page does not continue automatically, please return to the homepage or try signing in again.
-          </p>
-          <Link
-            href="/"
-            className="mt-6 inline-flex rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
-          >
-            Back to Home
-          </Link>
-        </div>
-      </div>
-    </main>
-  );
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json()) as LoginUrlRequest;
+
+    if (!body.codeChallenge || !body.state || !body.redirectUri) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Missing codeChallenge, state, or redirectUri",
+        },
+        { status: 400 }
+      );
+    }
+
+    const clientId = getEnv("QURAN_CLIENT_ID");
+    const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
+
+    const url = new URL(`${baseUrl}/authorize`);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", clientId);
+    url.searchParams.set("redirect_uri", body.redirectUri);
+    url.searchParams.set("code_challenge", body.codeChallenge);
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set("state", body.state);
+
+    // Request only the scopes you actually need.
+    url.searchParams.set("scope", "openid offline_access streak user");
+
+    return NextResponse.json({
+      success: true,
+      url: url.toString(),
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "Failed to build login URL",
+      },
+      { status: 500 }
+    );
+  }
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Menu } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../providers/AuthProvider";
+import LoginButton from "./LoginButton";
 
 const navLinks = [
   { label: "How It Works", href: "#how-it-works" },
@@ -23,11 +24,11 @@ export default function Header() {
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
         <Link href="/" className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/15 ring-1 ring-emerald-400/30">
-            <span className="text-lg font-bold text-emerald-400">Q</span>
+            <span className="text-lg font-bold text-emerald-400">I</span>
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-wide text-white">Quran Journey</p>
-            <p className="text-xs text-slate-400">Grow daily with the Quran</p>
+            <p className="text-sm font-semibold tracking-wide text-white">IlmCubs</p>
+            <p className="text-xs text-slate-400">Grow knowledge with the Quran</p>
           </div>
         </Link>
 
@@ -65,12 +66,10 @@ export default function Header() {
             </>
           ) : (
             <>
-              <Link
-                href="/login"
+              <LoginButton
                 className="rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-              >
-                Sign in
-              </Link>
+                onClickStart={() => setOpen(false)} 
+              />
               <Link
                 href="/register"
                 className="rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
@@ -127,13 +126,10 @@ export default function Header() {
               </>
             ) : (
               <>
-                <Link
-                  href="/login"
+                <LoginButton 
                   className="mt-2 inline-flex w-fit rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-white/10"
-                  onClick={() => setOpen(false)}
-                >
-                  Sign in
-                </Link>
+                  onClickStart={() => setOpen(false)}  
+                />
                 <Link
                   href="/register"
                   className="inline-flex w-fit rounded-full bg-white px-5 py-2.5 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"

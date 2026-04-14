@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { getJuz, getVerseByKey } from "../lib/content-api";
+import { CurrentStreakResponse, getCurrentQuranStreak } from "../lib/user-api";
 
 type Juz = {
   id: number;
@@ -343,6 +344,10 @@ const StoryTime: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [verseDisplay, setVerseDisplay] = useState<VerseDisplay | null>(null);
 
+  const [currentStreak, setCurrentStreak] = useState<number | null>(null);
+  const [streakLoading, setStreakLoading] = useState(true);
+  const [streakError, setStreakError] = useState<string | null>(null);
+
   const currentJuz = juzList[currentIndex];
 
   const currentStory = useMemo(() => {
@@ -353,6 +358,29 @@ const StoryTime: React.FC = () => {
   }, [currentJuz]);
 
   const totalJuz = juzList.length;
+
+  useEffect(() => {
+    async function loadStreak(){
+
+      try {
+        const result = await getCurrentQuranStreak();
+
+        if(result.success && result.data){
+          setCurrentStreak(result.data.currentStreak);
+        } else {
+          setStreakError(result.message || "Could not load streak");
+        }
+      } catch (error){
+        setStreakError(
+          error instanceof Error ? error.message : "Could not load streak"
+        );
+      } finally {
+        setStreakLoading(false);
+      }
+    }
+
+    loadStreak();
+  }, [])
 
   useEffect(() => {
     let cancelled = false;
@@ -499,6 +527,17 @@ const StoryTime: React.FC = () => {
   return (
     <div className="rounded-[34px] border-4 border-white/60 bg-white/35 p-7 shadow-[0_30px_70px_-45px_rgba(2,6,23,0.55)] backdrop-blur">
       <div className="mb-6 rounded-3xl border border-white/70 bg-gradient-to-r from-sky-200 via-emerald-100 to-yellow-100 p-5 text-center shadow-inner">
+        
+        <div className="mb-4 flex justify-center">
+          <div className="rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-slate-800 shadow">
+            {streakLoading
+              ? "Loading streak..."
+              : streakError
+              ? "Story streak unavailable"
+              : `🔥 ${currentStreak ?? 0} day Quran streak`}
+          </div>
+        </div>
+        
         <h1 className="text-3xl font-extrabold text-slate-950">
           📖 Story Time
         </h1>

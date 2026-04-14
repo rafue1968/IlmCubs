@@ -1,4 +1,10 @@
 import StoryTime from "../components/StoryTime";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Storytime",
+};
+
 
 export default function StoryTimePage() {
   return (

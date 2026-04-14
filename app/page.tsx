@@ -7,6 +7,11 @@ import Pathways from "./components/PathwaysSection";
 import AudienceSection from "./components/AudienceSection";
 import CTASection from "./components/CTASection";
 import Footer from "./components/Footer";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "IlmCubs Homepage",
+};
 
 export default function HomePage() {
   return (

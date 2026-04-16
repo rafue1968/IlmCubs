@@ -84,7 +84,7 @@ export default function QuizzesPage() {
               title="Story Time"
               subtitle="Little stories and lessons from the Quran (soon)."
               emoji="📖"
-              disabled
+              href="/storytime"
             />
           </div>
 

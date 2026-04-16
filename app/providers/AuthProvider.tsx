@@ -2,7 +2,7 @@
 
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { firebaseAuth } from "../lib/firebaseClient";
+import { getFirebaseAuth } from "../lib/firebaseClient";
 
 type AuthContextValue = {
   user: User | null;
@@ -17,7 +17,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(firebaseAuth, (u) => {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      queueMicrotask(() => setLoading(false));
+      return;
+    }
+
+    const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoading(false);
     });
@@ -29,7 +35,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       loading,
       signOut: async () => {
-        await signOut(firebaseAuth);
+        const auth = getFirebaseAuth();
+        if (!auth) return;
+        await signOut(auth);
       },
     }),
     [user, loading]

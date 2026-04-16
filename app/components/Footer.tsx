@@ -10,8 +10,8 @@ export default function Footer() {
         </div>
 
         <div className="flex flex-wrap items-center gap-5">
-          <Link href="/" className="transition hover:text-white">
-            Home
+          <Link href="/quizzes" className="transition hover:text-white">
+            Quizzes
           </Link>
           <a href="#features" className="transition hover:text-white">
             Features

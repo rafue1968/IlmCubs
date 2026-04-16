@@ -1,5 +1,7 @@
-import { initializeApp, getApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
+"use client";
+
+import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
@@ -10,5 +12,26 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const firebaseAuth = getAuth(firebaseApp);
+function hasFirebaseConfig(cfg: typeof firebaseConfig) {
+  return Object.values(cfg).every((v) => typeof v === "string" && v.trim().length > 0);
+}
+
+let _app: FirebaseApp | null = null;
+let _auth: Auth | null = null;
+
+export function getFirebaseApp(): FirebaseApp | null {
+  if (typeof window === "undefined") return null;
+  if (!hasFirebaseConfig(firebaseConfig)) return null;
+  if (_app) return _app;
+  _app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  return _app;
+}
+
+export function getFirebaseAuth(): Auth | null {
+  if (typeof window === "undefined") return null;
+  const app = getFirebaseApp();
+  if (!app) return null;
+  if (_auth) return _auth;
+  _auth = getAuth(app);
+  return _auth;
+}

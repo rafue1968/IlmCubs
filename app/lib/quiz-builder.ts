@@ -13,8 +13,17 @@ export type QuizRound = {
   goodDeed: string;
 };
 
-export function buildQuizRound(apiResponse: any, pack: ThemePack): QuizRound {
-  const firstVerse = apiResponse?.data?.verses?.[0];
+type QuranApiVerse = {
+  text_uthmani?: string;
+  translations?: Array<{ text?: string }>;
+};
+
+type QuranApiResponse = {
+  data?: { verses?: QuranApiVerse[] };
+};
+
+export function buildQuizRound(apiResponse: QuranApiResponse, pack: ThemePack): QuizRound {
+  const firstVerse = apiResponse.data?.verses?.[0];
 
   return {
     id: pack.id,

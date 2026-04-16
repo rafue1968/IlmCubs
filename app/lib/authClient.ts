@@ -1,3 +1,5 @@
+"use client";
+
 export type AuthUser = {
   uid: string;
   email: string;
@@ -10,7 +12,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 
-import { firebaseAuth } from "./firebaseClient";
+import { getFirebaseAuth } from "./firebaseClient";
 
 export async function registerWithEmail(params: {
   email: string;
@@ -18,8 +20,11 @@ export async function registerWithEmail(params: {
   displayName?: string;
 }): Promise<{ user: AuthUser }> {
   try {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase is not configured.");
+
     const cred = await createUserWithEmailAndPassword(
-      firebaseAuth,
+      auth,
       params.email,
       params.password
     );
@@ -45,8 +50,11 @@ export async function loginWithEmail(params: {
   password: string;
 }): Promise<{ user: AuthUser }> {
   try {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase is not configured.");
+
     const cred = await signInWithEmailAndPassword(
-      firebaseAuth,
+      auth,
       params.email,
       params.password
     );

@@ -31,9 +31,7 @@ export async function POST(req: Request) {
     url.searchParams.set("code_challenge", body.codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("state", body.state);
-
-    // Request only the scopes you actually need.
-    url.searchParams.set("scope", "openid offline_access streak user");
+    url.searchParams.set("scope", "openid offline_access user streak");
 
     return NextResponse.json({
       success: true,

@@ -67,29 +67,50 @@ export async function GET(req: Request) {
 
   try {
     const response = await fetch(url, { headers });
+    const rawText = await response.text();
+
+    let payload: any = null;
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = { raw: rawText };
+    }
 
     if (response.status === 400) {
       return Response.json(
-        { success: false, message: "missing or invalid query params" },
+        {
+          success: false,
+          message: "missing or invalid query params",
+          upstreamStatus: response.status,
+          upstream: payload,
+        },
         { status: 400 }
       );
     }
 
     if (!response.ok) {
-      throw new Error("Failed to fetch current streak");
+      return Response.json(
+        {
+          success: false,
+          message: "upstream current streak request failed",
+          upstreamStatus: response.status,
+          upstream: payload,
+        },
+        { status: 500 }
+      );
     }
-
-    const payload = (await response.json()) as {
-      data?: unknown;
-    };
 
     return Response.json({
       success: true,
       data: payload.data,
     });
-  } catch {
+  } catch (error) {
     return Response.json(
-      { success: false, message: "failed to fetch current streak" },
+      {
+        success: false,
+        message:
+          error instanceof Error ? error.message : "failed to fetch current streak",
+      },
       { status: 500 }
     );
   }

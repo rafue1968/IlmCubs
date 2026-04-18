@@ -7,6 +7,11 @@ type CallbackRequest = {
   redirectUri?: string;
 };
 
+function basicAuthHeader(clientId: string, clientSecret: string) {
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+  return `Basic ${credentials}`;
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as CallbackRequest;
@@ -28,8 +33,6 @@ export async function POST(req: Request) {
     const form = new URLSearchParams({
       grant_type: "authorization_code",
       code: body.code,
-      client_id: clientId,
-      client_secret: clientSecret,
       redirect_uri: body.redirectUri,
       code_verifier: body.codeVerifier,
     });
@@ -38,6 +41,7 @@ export async function POST(req: Request) {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: basicAuthHeader(clientId, clientSecret),
       },
       body: form,
     });

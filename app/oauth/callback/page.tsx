@@ -47,10 +47,15 @@ export default function OAuthCallbackPage() {
           }),
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
 
         if (!res.ok || !data?.success) {
-          throw new Error(data?.message || "Failed to complete sign-in");
+          const details =
+            data?.upstream?.error_description ||
+            data?.upstream?.error ||
+            data?.message ||
+            "Failed to complete sign-in";
+          throw new Error(details);
         }
 
         sessionStorage.removeItem("quran_oauth_state");

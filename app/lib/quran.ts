@@ -1,10 +1,44 @@
-export async function getChapters() {
+export type QuranChapter = {
+  id: number;
+  name_simple: string;
+  name_arabic: string;
+  translated_name?: {
+    name?: string;
+  };
+};
+
+export type ChaptersResponse = {
+  success: boolean;
+  data?: {
+    chapters?: QuranChapter[];
+  };
+};
+
+export type QuranVerse = {
+  verse_key: string;
+  text_uthmani?: string | null;
+  translations?: Array<{
+    text?: string | null;
+  }> | null;
+};
+
+export type VersesResponse = {
+  success: boolean;
+  data?: {
+    verses?: QuranVerse[];
+  };
+};
+
+export async function getChapters(): Promise<ChaptersResponse> {
   const res = await fetch("/api/quran?type=chapters");
   if (!res.ok) throw new Error("Failed to fetch chapters");
   return res.json();
 }
 
-export async function getVersesByChapter(chapter: number, translations = "131") {
+export async function getVersesByChapter(
+  chapter: number,
+  translations = "131"
+): Promise<VersesResponse> {
   const res = await fetch(
     `/api/quran?type=verses&chapter=${chapter}&translations=${translations}`
   );

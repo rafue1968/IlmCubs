@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const REDIRECT_URI =
-  "https://quran-companion-real-life-guidance-omega.vercel.app/oauth/callback";
+  "https://ilm-cubs.vercel.app/oauth/callback";
 
 export default function OAuthCallbackPage() {
   const [message, setMessage] = useState("Logging you in...");

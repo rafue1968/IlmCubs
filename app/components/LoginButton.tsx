@@ -25,7 +25,7 @@ export default function LoginButton({ className, onClickStart }: Props) {
       body: JSON.stringify({
         codeChallenge,
         state,
-        redirectUri: "https://quran-companion-real-life-guidance-omega.vercel.app/oauth/callback",
+        redirectUri: "https://ilm-cubs.vercel.app/oauth/callback",
       }),
     });
 

@@ -1,5 +1,18 @@
 import { ThemePack } from "./theme-packs";
 
+type QuizApiVerse = {
+  text_uthmani?: string | null;
+  translations?: Array<{
+    text?: string | null;
+  }> | null;
+};
+
+type QuizApiResponse = {
+  data?: {
+    verses?: QuizApiVerse[] | null;
+  } | null;
+};
+
 export type QuizRound = {
   id: string;
   chapter: number;
@@ -13,17 +26,11 @@ export type QuizRound = {
   goodDeed: string;
 };
 
-type QuranApiVerse = {
-  text_uthmani?: string;
-  translations?: Array<{ text?: string }>;
-};
-
-type QuranApiResponse = {
-  data?: { verses?: QuranApiVerse[] };
-};
-
-export function buildQuizRound(apiResponse: QuranApiResponse, pack: ThemePack): QuizRound {
-  const firstVerse = apiResponse.data?.verses?.[0];
+export function buildQuizRound(
+  apiResponse: QuizApiResponse,
+  pack: ThemePack
+): QuizRound {
+  const firstVerse = apiResponse?.data?.verses?.[0];
 
   return {
     id: pack.id,

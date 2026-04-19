@@ -19,7 +19,11 @@ export async function GET(req: Request) {
   }
 
   try {
-    const res = await fetch(`${base}/verses/by_key/${key}?translations=${translations}`);
+    const res = await fetch(
+      `${base}/verses/by_key/${encodeURIComponent(key)}` +
+        `?translations=${encodeURIComponent(translations)}` +
+        `&fields=text_uthmani`
+    );
 
     if (!res.ok) {
       throw new Error("Failed to fetch verse");

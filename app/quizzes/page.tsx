@@ -82,7 +82,7 @@ export default function QuizzesPage() {
             />
             <QuizCard
               title="Story Time"
-              subtitle="Little stories and lessons from the Quran (soon)."
+              subtitle="Little stories and lessons from the Quran."
               emoji="📖"
               href="/storytime"
             />

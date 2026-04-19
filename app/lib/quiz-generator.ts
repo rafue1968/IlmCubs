@@ -1,5 +1,7 @@
 import type { QuranChapter, QuranVerse } from "@/app/lib/quran";
-import { MATCH_SURAH_CONFIG } from "@/app/lib/quiz-config";
+import type {
+  MatchSurahModeConfig,
+} from "@/app/lib/quiz-config";
 import type { QuizChoice, QuizQuestion } from "@/app/lib/quiz-types";
 
 export function shuffleArray<T>(items: T[]): T[] {
@@ -28,14 +30,15 @@ export function pickQuestionVerse(verses: QuranVerse[]): QuranVerse | null {
 
 export function buildMatchSurahQuestions(
   chapters: QuranChapter[],
-  versesByChapter: Map<number, QuranVerse[]>
+  versesByChapter: Map<number, QuranVerse[]>,
+  config: MatchSurahModeConfig
 ): QuizQuestion[] {
   const candidateChapters = chapters.filter((chapter) =>
-    MATCH_SURAH_CONFIG.allowedChapterIds.includes(chapter.id)
+    config.allowedChapterIds.includes(chapter.id)
   );
 
   return shuffleArray(candidateChapters)
-    .slice(0, MATCH_SURAH_CONFIG.totalRounds)
+    .slice(0, config.totalRounds)
     .map((chapter) => {
       const verses = versesByChapter.get(chapter.id) || [];
       const verse = pickQuestionVerse(verses);
@@ -47,7 +50,7 @@ export function buildMatchSurahQuestions(
       const distractors: QuizChoice[] = shuffleArray(
         candidateChapters.filter((candidate) => candidate.id !== chapter.id)
       )
-        .slice(0, MATCH_SURAH_CONFIG.optionCount - 1)
+        .slice(0, config.optionCount - 1)
         .map((candidate) => ({
           id: candidate.id,
           latinName: candidate.name_simple,

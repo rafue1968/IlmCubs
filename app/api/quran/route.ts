@@ -2,10 +2,15 @@ type VerseTranslation = {
   text?: string | null;
 };
 
+type VerseWord = {
+  translation?: VerseTranslation | null;
+};
+
 type Verse = {
   verse_key: string;
   text_uthmani?: string | null;
   translations?: VerseTranslation[] | null;
+  words?: VerseWord[] | null;
 };
 
 type VersesPayload = {
@@ -29,6 +34,20 @@ async function fetchJson(url: string) {
   }
 
   return res.json();
+}
+
+function buildVerseTranslation(verse: Verse): VerseTranslation[] | undefined {
+  if (verse.translations?.[0]?.text) {
+    return verse.translations;
+  }
+
+  const text = (verse.words || [])
+    .map((word) => word.translation?.text?.trim())
+    .filter((word): word is string => Boolean(word))
+    .join(" ")
+    .trim();
+
+  return text ? [{ text }] : undefined;
 }
 
 export async function GET(req: Request) {
@@ -63,7 +82,11 @@ export async function GET(req: Request) {
         if (!chapter) {
           return Response.json({ error: "chapter required" }, { status: 400 });
         }
-        url = `${base}/verses/by_chapter/${chapter}?translations=${encodeURIComponent(translations)}`;
+        url =
+          `${base}/verses/by_chapter/${chapter}` +
+          `?translations=${encodeURIComponent(translations)}` +
+          `&fields=text_uthmani` +
+          `&words=true`;
         break;
 
       case "verse":
@@ -102,6 +125,13 @@ export async function GET(req: Request) {
 
     try {
       const data = await fetchJson(url);
+
+      if (type === "verses" && Array.isArray(data?.verses)) {
+        data.verses = data.verses.map((verse: Verse) => ({
+          ...verse,
+          translations: buildVerseTranslation(verse),
+        }));
+      }
 
       return Response.json({
         success: true,

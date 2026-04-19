@@ -1,4 +1,4 @@
-import type { QuizState } from "./quiz-types";
+import type { QuizState } from "@/app/lib/quiz-types";
 
 export function createQuizState(): QuizState {
   return {
@@ -13,7 +13,9 @@ export function selectAnswer(
   selectedChoiceId: number,
   correctChoiceId: number
 ): QuizState {
-  if (state.selectedChoiceId !== null) return state;
+  if (state.selectedChoiceId !== null) {
+    return state;
+  }
 
   return {
     ...state,
@@ -31,6 +33,6 @@ export function goToNextQuestion(state: QuizState): QuizState {
   };
 }
 
-export function restartQuiz(): QuizState {
+export function restartQuizState(): QuizState {
   return createQuizState();
 }

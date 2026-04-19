@@ -1,35 +1,41 @@
 import type { QuranChapter, QuranVerse } from "@/app/lib/quran";
-import type { QuizQuestion, QuizChoice } from "./quiz-types";
-import { matchSurahConfig } from "./quiz-config";
+import { MATCH_SURAH_CONFIG } from "@/app/lib/quiz-config";
+import type { QuizChoice, QuizQuestion } from "@/app/lib/quiz-types";
 
-function shuffleArray<T>(items: T[]): T[] {
+export function shuffleArray<T>(items: T[]): T[] {
   const copy = [...items];
+
   for (let i = copy.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
+
   return copy;
 }
 
-function pickQuestionVerse(verses: QuranVerse[]): QuranVerse | null {
-  const valid = verses.filter(
-    (verse) => Boolean(verse.text_uthmani) && Boolean(verse.translations?.[0]?.text)
+export function pickQuestionVerse(verses: QuranVerse[]): QuranVerse | null {
+  const filtered = verses.filter(
+    (verse) =>
+      Boolean(verse.text_uthmani) && Boolean(verse.translations?.[0]?.text)
   );
 
-  if (valid.length === 0) return null;
-  return valid[Math.floor(Math.random() * valid.length)] ?? null;
+  if (filtered.length === 0) {
+    return null;
+  }
+
+  return filtered[Math.floor(Math.random() * filtered.length)] ?? null;
 }
 
 export function buildMatchSurahQuestions(
   chapters: QuranChapter[],
   versesByChapter: Map<number, QuranVerse[]>
 ): QuizQuestion[] {
-  const allowed = chapters.filter((chapter) =>
-    matchSurahConfig.allowedChapterIds.includes(chapter.id)
+  const candidateChapters = chapters.filter((chapter) =>
+    MATCH_SURAH_CONFIG.allowedChapterIds.includes(chapter.id)
   );
 
-  return shuffleArray(allowed)
-    .slice(0, matchSurahConfig.totalRounds)
+  return shuffleArray(candidateChapters)
+    .slice(0, MATCH_SURAH_CONFIG.totalRounds)
     .map((chapter) => {
       const verses = versesByChapter.get(chapter.id) || [];
       const verse = pickQuestionVerse(verses);
@@ -39,9 +45,9 @@ export function buildMatchSurahQuestions(
       }
 
       const distractors: QuizChoice[] = shuffleArray(
-        allowed.filter((candidate) => candidate.id !== chapter.id)
+        candidateChapters.filter((candidate) => candidate.id !== chapter.id)
       )
-        .slice(0, matchSurahConfig.optionCount - 1)
+        .slice(0, MATCH_SURAH_CONFIG.optionCount - 1)
         .map((candidate) => ({
           id: candidate.id,
           latinName: candidate.name_simple,

@@ -33,6 +33,8 @@ type GeneratedMatchSurahQuestion = {
   successMessage: string;
   retryMessage: string;
   hint?: string;
+  story?: string;
+  goodDeed?: string;
 };
 
 type SourceQuestion = {
@@ -43,6 +45,15 @@ type SourceQuestion = {
   correctSurahName: string;
   correctSurahArabic: string;
   choices: QuizChoice[];
+};
+
+type GeminiEnhancement = {
+  prompt: string;
+  successMessage: string;
+  retryMessage: string;
+  hint: string;
+  story: string;
+  goodDeed: string;
 };
 
 const ALLOWED_CHAPTER_IDS = [105, 106, 107, 108, 109, 110, 111, 112, 113, 114];
@@ -107,6 +118,8 @@ function buildFallbackQuestion(source: SourceQuestion): GeneratedMatchSurahQuest
     successMessage: "Great job! That is correct!",
     retryMessage: `Nice try. This verse is from ${source.correctSurahName}.`,
     hint: "Look carefully and choose the right surah.",
+    story: "A child is learning a beautiful Quran verse.",
+    goodDeed: "Be kind today.",
   };
 }
 
@@ -119,16 +132,29 @@ async function generateOneQuestionWithGemini(
   geminiKey: string
 ): Promise<GeneratedMatchSurahQuestion | null> {
   const prompt = `
-You are creating ONE Quran quiz question for children aged 4 to 6.
+You are creating a gentle Quran learning experience for children aged 4 to 6.
 
-Use ONLY the facts given below.
-Do NOT change the correct surah.
-Do NOT change the Arabic verse.
-Do NOT change the translation.
-Do NOT change the choices.
-Keep all text short, warm, playful, and easy for a small child.
+RULES:
+- Use ONLY the Quran facts provided.
+- DO NOT change the verse.
+- DO NOT change the translation.
+- DO NOT change the surah.
+- DO NOT change the answer choices.
+- Keep the language very simple.
+- Use very short sentences.
+- Make the tone warm, cheerful, and kind.
+- Story must be a tiny child-friendly everyday situation.
+- Good deed must be one simple action a child can do today.
 
 Return ONLY valid JSON.
+
+Generate:
+- story
+- prompt
+- hint
+- successMessage
+- retryMessage
+- goodDeed
 
 Source data:
 ${JSON.stringify(source, null, 2)}
@@ -145,47 +171,25 @@ ${JSON.stringify(source, null, 2)}
       responseSchema: {
         type: "OBJECT",
         properties: {
-          verseKey: { type: "STRING" },
-          arabicText: { type: "STRING" },
-          translationText: { type: "STRING" },
           prompt: { type: "STRING" },
-          correctChapterId: { type: "NUMBER" },
-          correctSurahName: { type: "STRING" },
-          correctSurahArabic: { type: "STRING" },
-          choices: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                id: { type: "NUMBER" },
-                latinName: { type: "STRING" },
-                arabicName: { type: "STRING" },
-              },
-              required: ["id", "latinName", "arabicName"],
-            },
-          },
           successMessage: { type: "STRING" },
           retryMessage: { type: "STRING" },
           hint: { type: "STRING" },
+          story: { type: "STRING" },
+          goodDeed: { type: "STRING" },
         },
         required: [
-          "verseKey",
-          "arabicText",
-          "translationText",
           "prompt",
-          "correctChapterId",
-          "correctSurahName",
-          "correctSurahArabic",
-          "choices",
           "successMessage",
           "retryMessage",
           "hint",
+          "story",
+          "goodDeed",
         ],
       },
     },
   };
 
-  // Small retry loop for temporary overload.
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
@@ -208,7 +212,6 @@ ${JSON.stringify(source, null, 2)}
     }
 
     if (!res.ok) {
-      // Retry on overload/unavailable.
       if ((res.status === 503 || res.status === 429) && attempt < 2) {
         await delay(500 * (attempt + 1));
         continue;
@@ -224,9 +227,8 @@ ${JSON.stringify(source, null, 2)}
     }
 
     try {
-      const parsed = JSON.parse(raw) as GeneratedMatchSurahQuestion;
+      const parsed = JSON.parse(raw) as GeminiEnhancement;
 
-      // Re-apply source truth fields no matter what Gemini says.
       return {
         verseKey: source.verseKey,
         arabicText: source.arabicText,
@@ -244,6 +246,12 @@ ${JSON.stringify(source, null, 2)}
         hint:
           parsed.hint?.trim() ||
           "Look carefully and choose the right surah.",
+        story:
+          parsed.story?.trim() ||
+          "A child is learning a beautiful Quran verse.",
+        goodDeed:
+          parsed.goodDeed?.trim() ||
+          "Be kind today.",
       };
     } catch {
       return null;

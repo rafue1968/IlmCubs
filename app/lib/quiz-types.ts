@@ -22,20 +22,22 @@ export type QuizState = {
 };
 
 
-export type GeminiMatchSurahQuestion = {
+type GeminiMatchSurahQuestion = {
   verseKey: string;
   arabicText: string;
   translationText: string;
+
+  story: string;
   prompt: string;
+  hint: string;
+  goodDeed: string;
+
   correctChapterId: number;
   correctSurahName: string;
   correctSurahArabic: string;
-  choices: {
-    id: number;
-    latinName: string;
-    arabicName: string;
-  }[];
+
+  choices: QuizChoice[];
+
   successMessage: string;
   retryMessage: string;
-  hint?: string;
 };

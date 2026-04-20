@@ -21,6 +21,8 @@ type GeminiMatchSurahQuestion = {
   successMessage: string;
   retryMessage: string;
   hint?: string;
+  story?: string;
+  goodDeed?: string;
 };
 
 type QuizState = {
@@ -148,15 +150,15 @@ export default function MatchTheSurahPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-700">
-                Gemini Quiz
+                Quran Adventure
               </p>
               <p className="mt-1 text-xl font-extrabold text-slate-950">
-                Endless verse challenge
+                Match the Surah
               </p>
             </div>
             <div className="rounded-2xl bg-white/60 px-4 py-3 text-center ring-2 ring-white/70">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-600">
-                Score
+                Stars
               </p>
               <p className="text-2xl font-extrabold text-emerald-700">
                 {quizState.score}/{totalQuestions || 5}
@@ -174,10 +176,10 @@ export default function MatchTheSurahPage() {
           {isLoading ? (
             <div className="mt-6 rounded-[26px] border-[3px] border-white/70 bg-white/45 p-6 text-center">
               <p className="text-lg font-extrabold text-slate-900">
-                Building your quiz...
+                Getting your game ready...
               </p>
               <p className="mt-2 text-sm font-semibold text-slate-700">
-                Fetching Quran verses and creating a child-friendly round.
+                Picking lovely Quran questions for you.
               </p>
             </div>
           ) : null}
@@ -185,7 +187,7 @@ export default function MatchTheSurahPage() {
           {error ? (
             <div className="mt-6 rounded-[26px] border-[3px] border-rose-200 bg-rose-50/80 p-6 text-center">
               <p className="text-lg font-extrabold text-rose-800">
-                We couldn&apos;t load the quiz.
+                Oops! The game is not ready yet.
               </p>
               <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-left text-xs font-semibold text-rose-700">
                 {error}
@@ -207,13 +209,13 @@ export default function MatchTheSurahPage() {
                 Finished
               </p>
               <h1 className="mt-2 text-3xl font-extrabold text-slate-950">
-                Great job!
+                Amazing work! 🌟
               </h1>
               <p className="mt-3 text-lg font-bold text-slate-800">
-                You matched {quizState.score} out of {totalQuestions} verses correctly.
+                You got {quizState.score} out of {totalQuestions} right!
               </p>
               <p className="mt-2 text-sm font-semibold text-slate-700">
-                Tap below for a fresh new set of generated questions.
+                Tap below for a brand new Quran game.
               </p>
 
               <button
@@ -228,6 +230,15 @@ export default function MatchTheSurahPage() {
 
           {!isLoading && !error && !isFinished && currentQuestion ? (
             <>
+              <div className="mt-4 rounded-2xl bg-yellow-100 p-4 text-center">
+                <p className="text-sm font-bold text-yellow-800">
+                  🌟 Little Story
+                </p>
+                <p className="mt-1 text-base font-semibold text-yellow-900">
+                  {currentQuestion.story || "Let’s learn a beautiful Quran lesson."}
+                </p>
+              </div>
+
               <div className="mt-6 rounded-[22px] border-2 border-emerald-300/60 bg-emerald-50/70 p-4 shadow-inner">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-900/70">
@@ -249,12 +260,12 @@ export default function MatchTheSurahPage() {
 
               <div className="mt-5 rounded-[26px] border-[3px] border-white/70 bg-white/40 p-4">
                 <p className="text-center text-xl font-extrabold text-slate-900">
-                  {currentQuestion.prompt}
+                  🎯 {currentQuestion.prompt}
                 </p>
 
                 {currentQuestion.hint ? (
                   <p className="mt-2 text-center text-sm font-semibold text-slate-700">
-                    {currentQuestion.hint}
+                    💡 {currentQuestion.hint}
                   </p>
                 ) : null}
 
@@ -314,17 +325,28 @@ export default function MatchTheSurahPage() {
                       className="mt-4 rounded-full bg-slate-900 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800"
                     >
                       {quizState.currentIndex + 1 === totalQuestions
-                        ? "See results"
-                        : "Next verse"}
+                        ? "See my stars"
+                        : "Next question"}
                     </button>
                   </div>
                 ) : (
                   <p className="mt-5 text-center text-sm font-semibold text-slate-700">
-                    Choose one answer to lock it in.
+                    Tap one answer to choose.
                   </p>
                 )}
               </div>
             </>
+          ) : null}
+
+          {quizState.selectedChoiceId !== null && currentQuestion ? (
+            <div className="mt-4 rounded-2xl bg-emerald-100 p-4 text-center">
+              <p className="text-sm font-bold text-emerald-800">
+                🌱 Try this!
+              </p>
+              <p className="mt-1 text-base font-semibold text-emerald-900">
+                {currentQuestion.goodDeed || "Be kind today."}
+              </p>
+            </div>
           ) : null}
         </div>
       </div>

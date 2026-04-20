@@ -55,7 +55,7 @@ export default function AuthCard({ mode }: { mode: Mode }) {
         router.push("/login");
       } else {
         await loginWithEmail({ email, password });
-        router.push("/");
+        router.push("/connect");
       }
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Authentication failed.");

@@ -6,6 +6,7 @@ import { Menu } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../providers/AuthProvider";
 import LoginButton from "./LoginButton";
+import StreakDisplay from "./StreakDisplay";
 
 const navLinks = [
   { label: "Quizzes", href: "/quizzes" },
@@ -58,6 +59,7 @@ export default function Header() {
         <div className="hidden items-center gap-3 md:flex">
           {!loading && user ? (
             <>
+              <StreakDisplay />
               <span className="hidden max-w-[220px] truncate text-sm text-slate-300 lg:inline">
                 Signed in as{" "}
                 <span className="font-medium text-white">

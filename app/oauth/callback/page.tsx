@@ -75,13 +75,13 @@ export default function OAuthCallbackPage() {
   return (
     <main className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto max-w-4xl px-6 py-20 lg:px-8">
-        <h1 className="text-4xl font-bold sm:text-5xl">Signing you in...</h1>
+        <h1 className="text-4xl font-bold sm:text-5xl">Connecting your account...</h1>
         <p className="mt-6 leading-8 text-slate-300">{message}</p>
 
         <div className="mt-10 rounded-3xl border border-white/10 bg-slate-900/80 p-8">
           <p className="leading-7 text-slate-300">
             If the page does not continue automatically, go back home and try
-            signing in again.
+            connecting again.
           </p>
 
           <Link

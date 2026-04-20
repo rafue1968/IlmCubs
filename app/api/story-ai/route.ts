@@ -1,68 +1,178 @@
-export async function POST(req: Request) {
-  const { surah, topic, previousQuestions } = await req.json();
+import { NextRequest, NextResponse } from "next/server";
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+type StoryItem = {
+  juzNumber: number;
+  title: string;
+  story: string;
+  verse: string;
+  options: { label: string; correct: boolean }[];
+};
 
-  if (!apiKey) {
-    return Response.json(
-      { success: false, error: "Missing ANTHROPIC_API_KEY in .env" },
-      { status: 500 }
-    );
-  }
+type GeminiStoryResponse = {
+  title: string;
+  story: string;
+  verse: string;
+  correctOption: string;
+  incorrectOption: string;
+};
 
-  const prompt = `You are a Quran quiz generator. Generate 5 multiple choice questions based on the ${surah} story about "${topic}" from the Quran.
+const GEMINI_MODEL = "gemini-2.5-flash";
 
-${previousQuestions && previousQuestions.length > 0 ? `Previously asked questions: ${previousQuestions.join(", ")}. Generate NEW different questions, not these.` : ""}
+function fallbackStory(juzNumber: number): StoryItem {
+  return {
+    juzNumber,
+    title: `Story from Juz ${juzNumber}`,
+    story: `In Juz ${juzNumber}, the Quran teaches us beautiful lessons about kindness, patience, and faith.`,
+    verse: "The Quran guides us to be good and kind.",
+    options: [
+      { label: "Follow the good teaching", correct: true },
+      { label: "Ignore the good teaching", correct: false },
+    ],
+  };
+}
 
-Format your response as JSON array with this structure:
-[
-  {
-    "question": "question text",
-    "options": ["option1", "option2", "option3", "option4"],
-    "correctAnswer": 0,
-    "explanation": "brief explanation"
-  }
-]
+async function generateAIStory(juzNumber: number, geminiKey: string): Promise<StoryItem> {
+  const prompt = `
+You are creating a very gentle Quran story card for children aged 4 to 6.
 
-Only return the JSON array, no other text.`;
+Task:
+Create one short child-friendly story inspired by Juz ${juzNumber}.
 
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+Rules:
+- Keep language very simple.
+- Use short sentences.
+- Make it warm, cheerful, and safe for little children.
+- Do not use scary or harsh language.
+- Keep the story general and child-friendly.
+- Include one short verse-style takeaway sentence.
+- Provide exactly 2 answer choices:
+  - one kind/good choice
+  - one unkind/wrong choice
+
+Return ONLY valid JSON.
+
+Schema:
+{
+  "title": "short title",
+  "story": "2 to 4 short sentences",
+  "verse": "1 short takeaway sentence",
+  "correctOption": "good action",
+  "incorrectOption": "wrong action"
+}
+`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+    {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022",
-        max_tokens: 1024,
-        messages: [
+        contents: [
           {
-            role: "user",
-            content: prompt,
+            parts: [{ text: prompt }],
           },
         ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              title: { type: "STRING" },
+              story: { type: "STRING" },
+              verse: { type: "STRING" },
+              correctOption: { type: "STRING" },
+              incorrectOption: { type: "STRING" },
+            },
+            required: [
+              "title",
+              "story",
+              "verse",
+              "correctOption",
+              "incorrectOption",
+            ],
+          },
+        },
       }),
-    });
+    }
+  );
 
-    const data = (await response.json()) as { content?: Array<{ text?: string }> };
+  const text = await res.text();
 
-    if (!response.ok || !data.content?.[0]?.text) {
-      throw new Error("Failed to generate questions");
+  let data: unknown = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("Gemini returned invalid JSON envelope for story generation");
+  }
+
+  if (!res.ok) {
+    throw new Error("Gemini story request failed");
+  }
+
+  const raw = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (!raw) {
+    throw new Error("Gemini returned no story text");
+  }
+
+  const parsed = JSON.parse(raw) as GeminiStoryResponse;
+
+  return {
+    juzNumber,
+    title: parsed.title?.trim() || `Story from Juz ${juzNumber}`,
+    story:
+      parsed.story?.trim() ||
+      `In Juz ${juzNumber}, the Quran teaches us beautiful lessons about being good and kind.`,
+    verse: parsed.verse?.trim() || "The Quran guides us to be good and kind.",
+    options: [
+      {
+        label: parsed.correctOption?.trim() || "Choose the kind action",
+        correct: true,
+      },
+      {
+        label: parsed.incorrectOption?.trim() || "Choose the unkind action",
+        correct: false,
+      },
+    ],
+  };
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const juzNumber = parseInt(searchParams.get("juz") || "1", 10);
+
+    if (Number.isNaN(juzNumber) || juzNumber < 1 || juzNumber > 30) {
+      return NextResponse.json(
+        { success: false, error: "Juz number must be between 1 and 30" },
+        { status: 400 }
+      );
     }
 
-    const text = data.content[0].text;
-    const questions = JSON.parse(text);
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) {
+      return NextResponse.json(
+        { success: false, error: "Missing GEMINI_API_KEY in .env" },
+        { status: 500 }
+      );
+    }
 
-    return Response.json({
-      success: true,
-      questions,
-    });
+    try {
+      const story = await generateAIStory(juzNumber, geminiKey);
+      return NextResponse.json({ success: true, story });
+    } catch (err) {
+      console.error("Gemini story generation failed:", err);
+      return NextResponse.json({
+        success: true,
+        story: fallbackStory(juzNumber),
+        fallback: true,
+      });
+    }
   } catch (error) {
-    console.error("Error generating quiz:", error);
-    return Response.json(
-      { success: false, error: "Failed to generate quiz questions" },
+    console.error("Error generating AI story:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to generate story" },
       { status: 500 }
     );
   }

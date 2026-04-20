@@ -48,6 +48,7 @@ type SourceQuestion = {
 const ALLOWED_CHAPTER_IDS = [105, 106, 107, 108, 109, 110, 111, 112, 113, 114];
 const TOTAL_QUESTIONS = 5;
 const OPTION_COUNT = 4;
+const GEMINI_MODEL = "gemini-2.5-flash";
 
 function shuffleArray<T>(items: T[]): T[] {
   const copy = [...items];
@@ -63,7 +64,6 @@ function normalizeVerse(verse: QuranVerse) {
     verse_key: verse.verse_key,
     arabic: verse.arabic ?? verse.text_uthmani ?? null,
     translation: verse.translation ?? verse.translations?.[0]?.text ?? null,
-    tafsir: verse.tafsir ?? null,
   };
 }
 
@@ -94,9 +94,167 @@ async function fetchJson(url: string) {
   };
 }
 
-export async function POST() {
+function buildFallbackQuestion(source: SourceQuestion): GeneratedMatchSurahQuestion {
+  return {
+    verseKey: source.verseKey,
+    arabicText: source.arabicText,
+    translationText: source.translationText,
+    prompt: "Which surah is this verse from?",
+    correctChapterId: source.correctChapterId,
+    correctSurahName: source.correctSurahName,
+    correctSurahArabic: source.correctSurahArabic,
+    choices: source.choices,
+    successMessage: "Great job! That is correct!",
+    retryMessage: `Nice try. This verse is from ${source.correctSurahName}.`,
+    hint: "Look carefully and choose the right surah.",
+  };
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateOneQuestionWithGemini(
+  source: SourceQuestion,
+  geminiKey: string
+): Promise<GeneratedMatchSurahQuestion | null> {
+  const prompt = `
+You are creating ONE Quran quiz question for children aged 4 to 6.
+
+Use ONLY the facts given below.
+Do NOT change the correct surah.
+Do NOT change the Arabic verse.
+Do NOT change the translation.
+Do NOT change the choices.
+Keep all text short, warm, playful, and easy for a small child.
+
+Return ONLY valid JSON.
+
+Source data:
+${JSON.stringify(source, null, 2)}
+`;
+
+  const requestBody = {
+    contents: [
+      {
+        parts: [{ text: prompt }],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          verseKey: { type: "STRING" },
+          arabicText: { type: "STRING" },
+          translationText: { type: "STRING" },
+          prompt: { type: "STRING" },
+          correctChapterId: { type: "NUMBER" },
+          correctSurahName: { type: "STRING" },
+          correctSurahArabic: { type: "STRING" },
+          choices: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                id: { type: "NUMBER" },
+                latinName: { type: "STRING" },
+                arabicName: { type: "STRING" },
+              },
+              required: ["id", "latinName", "arabicName"],
+            },
+          },
+          successMessage: { type: "STRING" },
+          retryMessage: { type: "STRING" },
+          hint: { type: "STRING" },
+        },
+        required: [
+          "verseKey",
+          "arabicText",
+          "translationText",
+          "prompt",
+          "correctChapterId",
+          "correctSurahName",
+          "correctSurahArabic",
+          "choices",
+          "successMessage",
+          "retryMessage",
+          "hint",
+        ],
+      },
+    },
+  };
+
+  // Small retry loop for temporary overload.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    const text = await res.text();
+
+    let data: unknown = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+
+    if (!res.ok) {
+      // Retry on overload/unavailable.
+      if ((res.status === 503 || res.status === 429) && attempt < 2) {
+        await delay(500 * (attempt + 1));
+        continue;
+      }
+      return null;
+    }
+
+    const raw =
+      (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as GeneratedMatchSurahQuestion;
+
+      // Re-apply source truth fields no matter what Gemini says.
+      return {
+        verseKey: source.verseKey,
+        arabicText: source.arabicText,
+        translationText: source.translationText,
+        prompt: parsed.prompt?.trim() || "Which surah is this verse from?",
+        correctChapterId: source.correctChapterId,
+        correctSurahName: source.correctSurahName,
+        correctSurahArabic: source.correctSurahArabic,
+        choices: source.choices,
+        successMessage:
+          parsed.successMessage?.trim() || "Great job! That is correct!",
+        retryMessage:
+          parsed.retryMessage?.trim() ||
+          `Nice try. This verse is from ${source.correctSurahName}.`,
+        hint:
+          parsed.hint?.trim() ||
+          "Look carefully and choose the right surah.",
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+export async function POST(req: Request) {
   try {
-    const appUrl = "http://localhost:3000";
     const geminiKey = process.env.GEMINI_API_KEY;
 
     if (!geminiKey) {
@@ -106,7 +264,9 @@ export async function POST() {
       );
     }
 
-    const chapterResult = await fetchJson(`${appUrl}/api/quran?type=chapters`);
+    const origin = new URL(req.url).origin;
+
+    const chapterResult = await fetchJson(`${origin}/api/quran?type=chapters`);
 
     if (!chapterResult.ok) {
       return NextResponse.json(
@@ -136,7 +296,6 @@ export async function POST() {
           step: "chapters-filter",
           message: "Not enough chapters available",
           chapterCount: chapters.length,
-          chapters,
         },
         { status: 500 }
       );
@@ -146,11 +305,8 @@ export async function POST() {
 
     const chapterPayloads = await Promise.all(
       targetChapters.map(async (chapter) => {
-        const result = await fetchJson(`${appUrl}/api/quran?chapter=${chapter.id}`);
-        return {
-          chapter,
-          result,
-        };
+        const result = await fetchJson(`${origin}/api/quran?chapter=${chapter.id}`);
+        return { chapter, result };
       })
     );
 
@@ -216,147 +372,30 @@ export async function POST() {
           success: false,
           step: "build-source-questions",
           message: "No valid source questions could be built",
-          debug: normalizedPayloads.map(({ chapter, verses }) => ({
-            chapterId: chapter.id,
-            chapterName: chapter.name_simple,
-            verseCount: verses.length,
-            firstVerse: verses[0] ?? null,
-            firstNormalizedVerse: verses[0] ? normalizeVerse(verses[0]) : null,
-          })),
         },
         { status: 500 }
       );
     }
 
-    const prompt = `
-You are generating Quran quiz questions for children aged 4 to 6.
-
-Use ONLY the Quran facts I provide.
-Do NOT invent Quran facts.
-Do NOT change the correct surah.
-Do NOT change the Arabic verse text.
-Do NOT change the translation text.
-Do NOT change the choices.
-Keep the language simple, warm, playful, and short.
-
-Return ONLY valid JSON as an array.
-
-For each question, produce:
-- verseKey
-- arabicText
-- translationText
-- prompt
-- correctChapterId
-- correctSurahName
-- correctSurahArabic
-- choices
-- successMessage
-- retryMessage
-- hint
-
-Here is the source question data:
-${JSON.stringify(sourceQuestions, null, 2)}
-`;
-
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
-        }),
-      }
+    const questions = await Promise.all(
+      sourceQuestions.map(async (source) => {
+        const generated = await generateOneQuestionWithGemini(source, geminiKey);
+        return generated ?? buildFallbackQuestion(source);
+      })
     );
 
-    const geminiText = await geminiRes.text();
-
-    let geminiJson: unknown = null;
-    try {
-      geminiJson = JSON.parse(geminiText);
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          step: "gemini-parse",
-          message: "Gemini returned non-JSON response",
-          raw: geminiText,
-        },
-        { status: 500 }
-      );
-    }
-
-    if (!geminiRes.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          step: "gemini-request",
-          message: "Gemini request failed",
-          gemini: geminiJson,
-        },
-        { status: 500 }
-      );
-    }
-
-    const rawText =
-      (geminiJson as any)?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    if (!rawText) {
-      return NextResponse.json(
-        {
-          success: false,
-          step: "gemini-empty",
-          message: "Gemini returned no question text",
-          gemini: geminiJson,
-        },
-        { status: 500 }
-      );
-    }
-
-    let generatedQuestions: GeneratedMatchSurahQuestion[] = [];
-    try {
-      generatedQuestions = JSON.parse(rawText) as GeneratedMatchSurahQuestion[];
-    } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          step: "gemini-question-json",
-          message: "Gemini question text was not valid JSON",
-          rawText,
-        },
-        { status: 500 }
-      );
-    }
-
-    const finalQuestions = sourceQuestions.map((source, index) => {
-      const generated = generatedQuestions[index];
-
-      return {
-        verseKey: source.verseKey,
-        arabicText: source.arabicText,
-        translationText: source.translationText,
-        prompt: generated?.prompt?.trim() || "Which surah is this verse from?",
-        correctChapterId: source.correctChapterId,
-        correctSurahName: source.correctSurahName,
-        correctSurahArabic: source.correctSurahArabic,
-        choices: source.choices,
-        successMessage:
-          generated?.successMessage?.trim() || "Great job! That is correct!",
-        retryMessage:
-          generated?.retryMessage?.trim() ||
-          `Nice try. This verse is from ${source.correctSurahName}.`,
-        hint:
-          generated?.hint?.trim() ||
-          "Look carefully and choose the right surah.",
-      };
-    });
+    const usedFallback = questions.some(
+      (question, index) =>
+        question.prompt === "Which surah is this verse from?" &&
+        question.successMessage === "Great job! That is correct!" &&
+        question.retryMessage ===
+          `Nice try. This verse is from ${sourceQuestions[index].correctSurahName}.`
+    );
 
     return NextResponse.json({
       success: true,
-      data: finalQuestions,
+      data: questions,
+      fallback: usedFallback,
     });
   } catch (error) {
     return NextResponse.json(

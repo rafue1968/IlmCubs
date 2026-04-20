@@ -3,217 +3,132 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import {
-  getChapters,
-  getVersesByChapter,
-  type QuranChapter,
-  type QuranVerse,
-} from "@/app/lib/quran";
-
 type QuizChoice = {
   id: number;
   latinName: string;
   arabicName: string;
 };
 
-type QuizQuestion = {
-  id: string;
-  chapterId: number;
-  surahTitle: string;
-  surahArabicTitle: string;
+type GeminiMatchSurahQuestion = {
+  verseKey: string;
   arabicText: string;
   translationText: string;
-  verseKey: string;
+  prompt: string;
+  correctChapterId: number;
+  correctSurahName: string;
+  correctSurahArabic: string;
   choices: QuizChoice[];
+  successMessage: string;
+  retryMessage: string;
+  hint?: string;
+  story?: string;
+  goodDeed?: string;
 };
 
-const QUIZ_CHAPTER_IDS = [
-  105, 106, 107, 108, 109, 110, 111, 112, 113, 114,
-];
-const TOTAL_ROUNDS = 5;
+type QuizState = {
+  currentIndex: number;
+  score: number;
+  selectedChoiceId: number | null;
+};
 
-function shuffleArray<T>(items: T[]): T[] {
-  const copy = [...items];
-
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-
-  return copy;
-}
-
-function pickQuestionVerse(verses: QuranVerse[]): QuranVerse | null {
-  const filtered = verses.filter(
-    (verse) => Boolean(verse.text_uthmani) && Boolean(verse.translations?.[0]?.text)
-  );
-
-  if (filtered.length === 0) {
-    return null;
-  }
-
-  return filtered[Math.floor(Math.random() * filtered.length)] ?? null;
-}
-
-function buildQuestions(
-  chapters: QuranChapter[],
-  versesByChapter: Map<number, QuranVerse[]>
-): QuizQuestion[] {
-  const candidateChapters = chapters.filter((chapter) =>
-    QUIZ_CHAPTER_IDS.includes(chapter.id)
-  );
-
-  return shuffleArray(candidateChapters)
-    .slice(0, TOTAL_ROUNDS)
-    .map((chapter) => {
-      const verses = versesByChapter.get(chapter.id) || [];
-      const verse = pickQuestionVerse(verses);
-
-      if (!verse?.text_uthmani || !verse.translations?.[0]?.text) {
-        return null;
-      }
-
-      const distractors = shuffleArray(
-        candidateChapters.filter((candidate) => candidate.id !== chapter.id)
-      )
-        .slice(0, 3)
-        .map((candidate) => ({
-          id: candidate.id,
-          latinName: candidate.name_simple,
-          arabicName: candidate.name_arabic,
-        }));
-
-      const choices = shuffleArray([
-        {
-          id: chapter.id,
-          latinName: chapter.name_simple,
-          arabicName: chapter.name_arabic,
-        },
-        ...distractors,
-      ]);
-
-      return {
-        id: verse.verse_key,
-        chapterId: chapter.id,
-        surahTitle: chapter.name_simple,
-        surahArabicTitle: chapter.name_arabic,
-        arabicText: verse.text_uthmani,
-        translationText: verse.translations[0].text,
-        verseKey: verse.verse_key,
-        choices,
-      };
-    })
-    .filter((question): question is QuizQuestion => Boolean(question));
+function createQuizState(): QuizState {
+  return {
+    currentIndex: 0,
+    score: 0,
+    selectedChoiceId: null,
+  };
 }
 
 export default function MatchTheSurahPage() {
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedChoiceId, setSelectedChoiceId] = useState<number | null>(null);
-  const [score, setScore] = useState(0);
+  const [questions, setQuestions] = useState<GeminiMatchSurahQuestion[]>([]);
+  const [quizState, setQuizState] = useState<QuizState>(createQuizState());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  async function loadQuiz() {
+    setIsLoading(true);
+    setError(null);
 
-    async function loadQuiz() {
-      setIsLoading(true);
-      setError(null);
+    try {
+      const res = await fetch("/api/quiz/match-surah/generate", {
+        method: "POST",
+      });
 
-      try {
-        const chapterResponse = await getChapters();
-        const chapters = chapterResponse.data?.chapters || [];
-        const quizChapters = chapters.filter((chapter) =>
-          QUIZ_CHAPTER_IDS.includes(chapter.id)
-        );
+      const data = await res.json();
 
-        const verseResponses = await Promise.all(
-          quizChapters.map(async (chapter) => ({
-            chapterId: chapter.id,
-            response: await getVersesByChapter(chapter.id),
-          }))
-        );
+      console.log("match-surah generate response:", data);
 
-        const versesByChapter = new Map<number, QuranVerse[]>(
-          verseResponses.map(({ chapterId, response }) => [
-            chapterId,
-            response.data?.verses || [],
-          ])
-        );
+      if (!res.ok || !data?.success || !Array.isArray(data?.data)) {
+        const details = [
+          data?.message,
+          data?.step ? `step: ${data.step}` : null,
+          data?.debug ? JSON.stringify(data.debug, null, 2) : null,
+          data?.chapterResult ? JSON.stringify(data.chapterResult, null, 2) : null,
+          data?.failedChapterFetch
+            ? JSON.stringify(data.failedChapterFetch, null, 2)
+            : null,
+          data?.raw ? JSON.stringify(data.raw, null, 2) : null,
+          data?.gemini ? JSON.stringify(data.gemini, null, 2) : null,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
-        const nextQuestions = buildQuestions(chapters, versesByChapter);
-
-        if (!isMounted) {
-          return;
-        }
-
-        if (nextQuestions.length === 0) {
-          throw new Error("No quiz questions were available from the Quran API.");
-        }
-
-        setQuestions(nextQuestions);
-        setCurrentIndex(0);
-        setSelectedChoiceId(null);
-        setScore(0);
-      } catch (loadError) {
-        if (!isMounted) {
-          return;
-        }
-
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Failed to load the quiz."
-        );
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        throw new Error(details || "Failed to load quiz session");
       }
+
+      setQuestions(data.data);
+      setQuizState(createQuizState());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Failed to load the quiz."
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }
 
+  useEffect(() => {
     loadQuiz();
-
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
-  const currentQuestion = questions[currentIndex] ?? null;
+  const currentQuestion = questions[quizState.currentIndex] ?? null;
   const totalQuestions = questions.length;
-  const isFinished = !isLoading && totalQuestions > 0 && currentIndex >= totalQuestions;
+  const isFinished =
+    !isLoading &&
+    totalQuestions > 0 &&
+    quizState.currentIndex >= totalQuestions;
+
   const progressValue =
-    totalQuestions > 0 ? Math.min((currentIndex / totalQuestions) * 100, 100) : 0;
+    totalQuestions > 0
+      ? Math.min((quizState.currentIndex / totalQuestions) * 100, 100)
+      : 0;
 
   function handleChoice(choiceId: number) {
-    if (!currentQuestion || selectedChoiceId !== null) {
+    if (!currentQuestion || quizState.selectedChoiceId !== null) {
       return;
     }
 
-    setSelectedChoiceId(choiceId);
+    const isCorrect = choiceId === currentQuestion.correctChapterId;
 
-    if (choiceId === currentQuestion.chapterId) {
-      setScore((currentScore) => currentScore + 1);
-    }
+    setQuizState((currentState) => ({
+      ...currentState,
+      selectedChoiceId: choiceId,
+      score: isCorrect ? currentState.score + 1 : currentState.score,
+    }));
   }
 
   function handleNext() {
-    if (selectedChoiceId === null) {
+    if (quizState.selectedChoiceId === null) {
       return;
     }
 
-    setCurrentIndex((index) => index + 1);
-    setSelectedChoiceId(null);
-  }
-
-  function handleRestart() {
-    const shuffled = shuffleArray(questions);
-    setQuestions(shuffled);
-    setCurrentIndex(0);
-    setSelectedChoiceId(null);
-    setScore(0);
-    setError(null);
+    setQuizState((currentState) => ({
+      ...currentState,
+      currentIndex: currentState.currentIndex + 1,
+      selectedChoiceId: null,
+    }));
   }
 
   return (
@@ -235,18 +150,18 @@ export default function MatchTheSurahPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-700">
-                Live Quran Quiz
+                Quran Adventure
               </p>
               <p className="mt-1 text-xl font-extrabold text-slate-950">
-                Verse to surah challenge
+                Match the Surah
               </p>
             </div>
             <div className="rounded-2xl bg-white/60 px-4 py-3 text-center ring-2 ring-white/70">
               <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-600">
-                Score
+                Stars
               </p>
               <p className="text-2xl font-extrabold text-emerald-700">
-                {score}/{totalQuestions || TOTAL_ROUNDS}
+                {quizState.score}/{totalQuestions || 5}
               </p>
             </div>
           </div>
@@ -259,43 +174,53 @@ export default function MatchTheSurahPage() {
           </div>
 
           {isLoading ? (
-            <div className="mt-6 rounded-[26px] border-3 border-white/70 bg-white/45 p-6 text-center">
+            <div className="mt-6 rounded-[26px] border-[3px] border-white/70 bg-white/45 p-6 text-center">
               <p className="text-lg font-extrabold text-slate-900">
-                Loading quiz from the Quran API...
+                Getting your game ready...
               </p>
               <p className="mt-2 text-sm font-semibold text-slate-700">
-                Pulling live verses and building your round set.
+                Picking lovely Quran questions for you.
               </p>
             </div>
           ) : null}
 
           {error ? (
-            <div className="mt-6 rounded-[26px] border-3 border-rose-200 bg-rose-50/80 p-6 text-center">
+            <div className="mt-6 rounded-[26px] border-[3px] border-rose-200 bg-rose-50/80 p-6 text-center">
               <p className="text-lg font-extrabold text-rose-800">
-                We couldn&apos;t load the quiz.
+                Oops! The game is not ready yet.
               </p>
-              <p className="mt-2 text-sm font-semibold text-rose-700">{error}</p>
+              <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-left text-xs font-semibold text-rose-700">
+                {error}
+              </pre>
+
+              <button
+                type="button"
+                onClick={loadQuiz}
+                className="mt-4 rounded-full bg-slate-900 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800"
+              >
+                Try again
+              </button>
             </div>
           ) : null}
 
           {isFinished ? (
-            <div className="mt-6 rounded-[26px] border-3 border-white/70 bg-white/45 p-6 text-center">
+            <div className="mt-6 rounded-[26px] border-[3px] border-white/70 bg-white/45 p-6 text-center">
               <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-700">
                 Finished
               </p>
               <h1 className="mt-2 text-3xl font-extrabold text-slate-950">
-                Great job!
+                Amazing work! 🌟
               </h1>
               <p className="mt-3 text-lg font-bold text-slate-800">
-                You matched {score} out of {totalQuestions} verses correctly.
+                You got {quizState.score} out of {totalQuestions} right!
               </p>
               <p className="mt-2 text-sm font-semibold text-slate-700">
-                Tap below to replay with a reshuffled set of live API questions.
+                Tap below for a brand new Quran game.
               </p>
 
               <button
                 type="button"
-                onClick={handleRestart}
+                onClick={loadQuiz}
                 className="mt-5 rounded-full bg-slate-900 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800"
               >
                 Play again
@@ -305,10 +230,19 @@ export default function MatchTheSurahPage() {
 
           {!isLoading && !error && !isFinished && currentQuestion ? (
             <>
+              <div className="mt-4 rounded-2xl bg-yellow-100 p-4 text-center">
+                <p className="text-sm font-bold text-yellow-800">
+                  🌟 Little Story
+                </p>
+                <p className="mt-1 text-base font-semibold text-yellow-900">
+                  {currentQuestion.story || "Let’s learn a beautiful Quran lesson."}
+                </p>
+              </div>
+
               <div className="mt-6 rounded-[22px] border-2 border-emerald-300/60 bg-emerald-50/70 p-4 shadow-inner">
                 <div className="flex items-center justify-between gap-4">
                   <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-900/70">
-                    Round {currentIndex + 1} of {totalQuestions}
+                    Round {quizState.currentIndex + 1} of {totalQuestions}
                   </p>
                   <p className="rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold text-emerald-900 ring-1 ring-emerald-200">
                     {currentQuestion.verseKey}
@@ -324,20 +258,26 @@ export default function MatchTheSurahPage() {
                 {currentQuestion.translationText}
               </p>
 
-              <div className="mt-5 rounded-[26px] border-3 border-white/70 bg-white/40 p-4">
+              <div className="mt-5 rounded-[26px] border-[3px] border-white/70 bg-white/40 p-4">
                 <p className="text-center text-xl font-extrabold text-slate-900">
-                  Which surah is this verse from?
+                  🎯 {currentQuestion.prompt}
                 </p>
+
+                {currentQuestion.hint ? (
+                  <p className="mt-2 text-center text-sm font-semibold text-slate-700">
+                    💡 {currentQuestion.hint}
+                  </p>
+                ) : null}
 
                 <div className="mt-4 grid grid-cols-2 gap-4">
                   {currentQuestion.choices.map((choice) => {
-                    const isCorrect = choice.id === currentQuestion.chapterId;
-                    const isSelected = choice.id === selectedChoiceId;
+                    const isCorrect = choice.id === currentQuestion.correctChapterId;
+                    const isSelected = choice.id === quizState.selectedChoiceId;
 
                     let buttonClasses =
                       "rounded-[22px] border-4 p-4 text-left shadow-[0_18px_40px_-30px_rgba(2,6,23,0.6)] transition active:scale-[0.99] ";
 
-                    if (selectedChoiceId === null) {
+                    if (quizState.selectedChoiceId === null) {
                       buttonClasses +=
                         "border-indigo-200/80 bg-indigo-50/80 hover:bg-indigo-50";
                     } else if (isCorrect) {
@@ -345,7 +285,8 @@ export default function MatchTheSurahPage() {
                     } else if (isSelected) {
                       buttonClasses += "border-rose-300 bg-rose-100";
                     } else {
-                      buttonClasses += "border-slate-200 bg-slate-100 opacity-70";
+                      buttonClasses +=
+                        "border-slate-200 bg-slate-100 opacity-70";
                     }
 
                     return (
@@ -353,7 +294,7 @@ export default function MatchTheSurahPage() {
                         key={choice.id}
                         type="button"
                         onClick={() => handleChoice(choice.id)}
-                        disabled={selectedChoiceId !== null}
+                        disabled={quizState.selectedChoiceId !== null}
                         className={buttonClasses}
                       >
                         <p className="text-center text-lg font-extrabold text-slate-900">
@@ -367,15 +308,15 @@ export default function MatchTheSurahPage() {
                   })}
                 </div>
 
-                {selectedChoiceId !== null ? (
+                {quizState.selectedChoiceId !== null ? (
                   <div className="mt-5 text-center">
                     <p className="text-base font-extrabold text-slate-900">
-                      {selectedChoiceId === currentQuestion.chapterId
-                        ? "Correct! Nice match."
-                        : `Nice try. This verse is from ${currentQuestion.surahTitle}.`}
+                      {quizState.selectedChoiceId === currentQuestion.correctChapterId
+                        ? currentQuestion.successMessage
+                        : currentQuestion.retryMessage}
                     </p>
                     <p className="mt-1 text-sm font-semibold text-slate-700">
-                      {currentQuestion.surahArabicTitle}
+                      {currentQuestion.correctSurahArabic}
                     </p>
 
                     <button
@@ -383,16 +324,29 @@ export default function MatchTheSurahPage() {
                       onClick={handleNext}
                       className="mt-4 rounded-full bg-slate-900 px-6 py-3 text-sm font-extrabold text-white transition hover:bg-slate-800"
                     >
-                      {currentIndex + 1 === totalQuestions ? "See results" : "Next verse"}
+                      {quizState.currentIndex + 1 === totalQuestions
+                        ? "See my stars"
+                        : "Next question"}
                     </button>
                   </div>
                 ) : (
                   <p className="mt-5 text-center text-sm font-semibold text-slate-700">
-                    Choose one answer to lock it in.
+                    Tap one answer to choose.
                   </p>
                 )}
               </div>
             </>
+          ) : null}
+
+          {quizState.selectedChoiceId !== null && currentQuestion ? (
+            <div className="mt-4 rounded-2xl bg-emerald-100 p-4 text-center">
+              <p className="text-sm font-bold text-emerald-800">
+                🌱 Try this!
+              </p>
+              <p className="mt-1 text-base font-semibold text-emerald-900">
+                {currentQuestion.goodDeed || "Be kind today."}
+              </p>
+            </div>
           ) : null}
         </div>
       </div>

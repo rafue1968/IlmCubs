@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { getJuz, getVerseByKey } from "../lib/content-api";
-import { CurrentStreakResponse, getCurrentQuranStreak } from "../lib/user-api";
+import { getCurrentQuranStreak } from "../lib/user-api";
 
 type Juz = {
   id: number;

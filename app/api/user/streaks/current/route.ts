@@ -3,6 +3,11 @@ import { getUserApiClient } from "@/app/lib/user-api-client";
 const USER_API_BASE_URL =
   "https://apis-prelive.quran.foundation/content/api/v1";
 
+type UpstreamPayload = {
+  data?: unknown;
+  raw?: string;
+};
+
 function getMockCurrentStreak(type: string) {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -69,7 +74,7 @@ export async function GET(req: Request) {
     const response = await fetch(url, { headers });
     const rawText = await response.text();
 
-    let payload: any = null;
+    let payload: UpstreamPayload | null = null;
     try {
       payload = JSON.parse(rawText);
     } catch {

@@ -20,3 +20,22 @@ export type QuizState = {
   score: number;
   selectedChoiceId: number | null;
 };
+
+
+export type GeminiMatchSurahQuestion = {
+  verseKey: string;
+  arabicText: string;
+  translationText: string;
+  prompt: string;
+  correctChapterId: number;
+  correctSurahName: string;
+  correctSurahArabic: string;
+  choices: {
+    id: number;
+    latinName: string;
+    arabicName: string;
+  }[];
+  successMessage: string;
+  retryMessage: string;
+  hint?: string;
+};

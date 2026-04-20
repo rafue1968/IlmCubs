@@ -165,7 +165,8 @@ export async function GET(req: Request) {
   const versesUrl =
     `${base}/verses/by_chapter/${encodeURIComponent(chapter)}` +
     `?translations=${encodeURIComponent(translationId)}` +
-    `&fields=text_uthmani`;
+    `&fields=text_uthmani` +
+    `&words=true`;
 
   const tafsirUrl =
     `${base}/quran/tafsirs/${encodeURIComponent(tafsirId)}` +
@@ -184,12 +185,16 @@ export async function GET(req: Request) {
       ])
     );
 
-    const data = (versesPayload.verses || []).map((verse) => ({
-      verse_key: verse.verse_key,
-      arabic: verse.text_uthmani ?? null,
-      translation: verse.translations?.[0]?.text ?? null,
-      tafsir: tafsirMap.get(verse.verse_key) ?? null,
-    }));
+    const data = (versesPayload.verses || []).map((verse) => {
+        const translations = buildVerseTranslation(verse);
+
+        return {
+            verse_key: verse.verse_key,
+            arabic: verse.text_uthmani ?? null,
+            translation: translations?.[0]?.text ?? null,
+            tafsir: tafsirMap.get(verse.verse_key) ?? null,
+        };
+        });
 
     return Response.json({ success: true, data });
   } catch {

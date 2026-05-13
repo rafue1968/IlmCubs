@@ -1,41 +1,85 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
+import {
+  createCodeChallenge,
+  getOAuthRedirectUri,
+  OAUTH_CODE_VERIFIER_COOKIE,
+  OAUTH_REDIRECT_URI_COOKIE,
+  OAUTH_SCOPES,
+  OAUTH_STATE_COOKIE,
+  randomOauthValue,
+  redactUrlForLogs,
+  redactValue,
+} from "@/app/lib/oauth-server";
 
-type LoginUrlRequest = {
-  codeChallenge?: string;
-  state?: string;
-  redirectUri?: string;
-};
+const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const body = (await req.json()) as LoginUrlRequest;
-
-    if (!body.codeChallenge || !body.state || !body.redirectUri) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Missing codeChallenge, state, or redirectUri",
-        },
-        { status: 400 }
-      );
-    }
-
     const clientId = getEnv("QURAN_CLIENT_ID");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
+    const redirectUri = getOAuthRedirectUri(req);
+    const state = randomOauthValue();
+    const codeVerifier = randomOauthValue(64);
+    const codeChallenge = createCodeChallenge(codeVerifier);
 
     const url = new URL(`${baseUrl}/oauth2/auth`);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", clientId);
-    url.searchParams.set("redirect_uri", body.redirectUri);
-    url.searchParams.set("code_challenge", body.codeChallenge);
+    url.searchParams.set("redirect_uri", redirectUri);
+    url.searchParams.set("code_challenge", codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
-    url.searchParams.set("state", body.state);
-    url.searchParams.set("scope", "openid offline_access user streak");
+    url.searchParams.set("state", state);
+    url.searchParams.set("scope", OAUTH_SCOPES);
+
+    console.info("[oauth.login] Starting authorization request", {
+      providerOrigin: new URL(baseUrl).origin,
+      responseType: "code",
+      redirectUri,
+      scopes: OAUTH_SCOPES,
+      hasPkce: true,
+      clientId: redactValue(clientId),
+      authorizationUrl: redactUrlForLogs(url.toString()),
+      redirectUriFromEnv: Boolean(process.env.QURAN_OAUTH_REDIRECT_URI?.trim()),
+    });
+
+    const res = NextResponse.redirect(url);
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax" as const,
+      path: "/",
+      maxAge: OAUTH_COOKIE_MAX_AGE_SECONDS,
+    };
+
+    res.cookies.set(OAUTH_STATE_COOKIE, state, cookieOptions);
+    res.cookies.set(OAUTH_CODE_VERIFIER_COOKIE, codeVerifier, cookieOptions);
+    res.cookies.set(OAUTH_REDIRECT_URI_COOKIE, redirectUri, cookieOptions);
+
+    return res;
+  } catch (error) {
+    console.error("[oauth.login] Failed to start OAuth login", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    return NextResponse.redirect(
+      new URL(
+        `/oauth/callback?error=login_failed&error_description=${encodeURIComponent(
+          "Unable to start OAuth login."
+        )}`,
+        req.url
+      )
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const loginUrl = new URL("/api/auth/login", req.url);
 
     return NextResponse.json({
       success: true,
-      url: url.toString(),
+      url: loginUrl.toString(),
     });
   } catch (error) {
     return NextResponse.json(

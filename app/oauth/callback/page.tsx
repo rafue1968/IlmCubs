@@ -3,9 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-const REDIRECT_URI =
-  "https://quran-companion-real-life-guidance-omega.vercel.app/oauth/callback";
-
 export default function OAuthCallbackPage() {
   const [message, setMessage] = useState("Logging you in...");
 
@@ -14,22 +11,35 @@ export default function OAuthCallbackPage() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
       const returnedState = params.get("state");
+      const providerError = params.get("error");
+      const providerErrorDescription = params.get("error_description");
 
-      const storedState = sessionStorage.getItem("quran_oauth_state");
-      const codeVerifier = sessionStorage.getItem("quran_pkce_code_verifier");
+      console.info("[oauth.callback.page] OAuth callback received", {
+        callbackUrl: window.location.href.replace(
+          /([?&](code|state)=)[^&]+/g,
+          "$1[redacted]"
+        ),
+        queryParamNames: Array.from(params.keys()),
+        hasCode: Boolean(code),
+        hasState: Boolean(returnedState),
+        providerError,
+      });
+
+      if (providerError) {
+        setMessage(
+          providerErrorDescription ||
+            `OAuth provider returned an error: ${providerError}`
+        );
+        return;
+      }
 
       if (!code) {
-        setMessage("Missing authorization code.");
+        setMessage("OAuth provider returned without an authorization code.");
         return;
       }
 
-      if (!returnedState || !storedState || returnedState !== storedState) {
-        setMessage("Invalid OAuth state.");
-        return;
-      }
-
-      if (!codeVerifier) {
-        setMessage("Missing PKCE code verifier.");
+      if (!returnedState) {
+        setMessage("OAuth provider returned without state.");
         return;
       }
 
@@ -42,8 +52,7 @@ export default function OAuthCallbackPage() {
           credentials: "same-origin",
           body: JSON.stringify({
             code,
-            codeVerifier,
-            redirectUri: REDIRECT_URI,
+            state: returnedState,
           }),
         });
 
@@ -57,9 +66,6 @@ export default function OAuthCallbackPage() {
             "Failed to complete sign-in";
           throw new Error(details);
         }
-
-        sessionStorage.removeItem("quran_oauth_state");
-        sessionStorage.removeItem("quran_pkce_code_verifier");
 
         window.location.href = "/";
       } catch (error) {

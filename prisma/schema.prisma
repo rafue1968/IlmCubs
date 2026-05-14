@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PARENT
+  CHILD
+}
+
+//
+// 👤 INTERNAL USER (mapped from OAuth)
+//
+model User {
+  id            String   @id @default(uuid())
+  oauthUserId   String   @unique
+  email         String?
+  role          UserRole @default(PARENT)
+
+  parentProfile ParentProfile?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+
+enum UserRole {
+  PARENT
+}
+
+//
+// 👨‍👩‍👧 PARENT PROFILE
+// (separates auth identity from app logic)
+//
+model ParentProfile {
+  id        String  @id @default(uuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id])
+
+  children  Child[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// 🧒 CHILD PROFILE
+//
+model Child {
+  id        String @id @default(uuid())
+
+  parentId  String
+  parent    ParentProfile @relation(fields: [parentId], references: [id])
+
+  name      String
+  age       Int?
+
+  streak    Streak?
+  bookmarks Bookmark[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// 🔥 STREAK (1:1 with child)
+//
+model Streak {
+  id        String @id @default(uuid())
+
+  childId   String @unique
+  child     Child  @relation(fields: [childId], references: [id])
+
+  current   Int @default(0)
+  longest   Int @default(0)
+  lastRead  DateTime?
+}
+
+//
+// 🔖 BOOKMARKS (many per child)
+//
+model Bookmark {
+  id        String @id @default(uuid())
+
+  childId   String
+  child     Child @relation(fields: [childId], references: [id])
+
+  surah     Int
+  ayah      Int
+
+  note      String?
+  createdAt DateTime @default(now())
+}

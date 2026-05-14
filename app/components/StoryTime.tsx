@@ -33,11 +33,6 @@ export default function StoryTime() {
   const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (selectedStory) {
-      generateQuestions();
-    }
-  }, [selectedStory]);
 
   const generateQuestions = async () => {
     if (!selectedStory) return;
@@ -84,6 +79,13 @@ export default function StoryTime() {
       setLoading(false);
     }
   };
+
+
+  useEffect(() => {
+    if (selectedStory) {
+      generateQuestions();
+    }
+  }, [selectedStory]);
 
   const handleAnswer = (index: number) => {
     if (answered) return;

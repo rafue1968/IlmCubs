@@ -90,7 +90,11 @@ export default function MatchTheSurahPage() {
   }
 
   useEffect(() => {
-    loadQuiz();
+    const init = async () => {
+      await loadQuiz();
+    };
+
+    init();
   }, []);
 
   const currentQuestion = questions[quizState.currentIndex] ?? null;

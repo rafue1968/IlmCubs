@@ -42,3 +42,7 @@ next-env.d.ts
 
 #codex 
 .codex 
+
+
+PASSWORDS.MD
+/src/generated/prisma

@@ -5,23 +5,29 @@ import { prisma } from "@/app/lib/prisma"
 
 export async function GET() {
   try {
-    const parentId = "TEMP_PARENT_ID" // replace later with auth
+    const parentUserId = "TEMP_PARENT_ID" // replace later with auth
 
-    const children = await prisma.user.findMany({
+    const children = await prisma.child.findMany({
       where: {
-        parentId: parentId,
+        parent: {
+          userId: parentUserId,
+        },
       },
       select: {
         id: true,
         name: true,
-        email: true,
-        role: true,
+        age: true,
         createdAt: true,
+      },
+      orderBy: {
+        createdAt: "asc",
       },
     })
 
     return NextResponse.json({ children })
   } catch (error) {
+    console.error("[parent.children] Failed to fetch children", error)
+
     return NextResponse.json(
       { error: "Failed to fetch children" },
       { status: 500 }

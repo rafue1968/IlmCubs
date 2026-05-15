@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import LoginButton from "../../components/LoginButton";
 import { loginWithEmail, registerWithEmail } from "../../lib/authClient";
 
 type Mode = "login" | "register";
@@ -142,6 +143,22 @@ export default function AuthCard({ mode }: { mode: Mode }) {
           <p className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200">
             {message}
           </p>
+        )}
+
+        {!isRegister && (
+          <>
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                Or
+              </span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+
+            <LoginButton className="inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300">
+              Sign in with Quran.com
+            </LoginButton>
+          </>
         )}
 
         <div className="flex items-center justify-between gap-3 pt-1 text-sm text-slate-300">

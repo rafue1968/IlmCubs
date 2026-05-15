@@ -3,9 +3,10 @@
 type Props = {
   className?: string;
   onClickStart?: () => void;
+  children?: string;
 };
 
-export default function LoginButton({ className, onClickStart }: Props) {
+export default function LoginButton({ className, onClickStart, children }: Props) {
   async function handleLogin() {
     onClickStart?.();
 
@@ -23,7 +24,7 @@ export default function LoginButton({ className, onClickStart }: Props) {
       }}
       className={className}
     >
-      Sign in
+      {children ?? "Sign in"}
     </button>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import LoginButton from "../../components/LoginButton";
 
 export default function OAuthCallbackPage() {
   const [message, setMessage] = useState("Logging you in...");
@@ -90,12 +91,18 @@ export default function OAuthCallbackPage() {
             connecting again.
           </p>
 
-          <Link
-            href="/"
-            className="mt-6 inline-flex rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300"
-          >
-            Back to Home
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <LoginButton className="inline-flex rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300">
+              Try sign in again
+            </LoginButton>
+
+            <Link
+              href="/"
+              className="inline-flex rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Back to Home
+            </Link>
+          </div>
         </div>
       </div>
     </main>

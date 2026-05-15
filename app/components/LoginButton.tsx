@@ -7,24 +7,15 @@ type Props = {
 };
 
 export default function LoginButton({ className, onClickStart, children }: Props) {
-  async function handleLogin() {
-    onClickStart?.();
-
-    window.location.assign("/api/auth/login");
-  }
-
   return (
-    <button
-      type="button"
+    <a
+      href="/api/auth/login"
       onClick={() => {
-        handleLogin().catch((err) => {
-          console.error(err);
-          alert("Login failed. Please try again.");
-        });
+        onClickStart?.();
       }}
       className={className}
     >
       {children ?? "Sign in"}
-    </button>
+    </a>
   );
 }

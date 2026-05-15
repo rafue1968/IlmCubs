@@ -3,6 +3,7 @@ import { getEnv } from "@/app/lib/env";
 import {
   createCodeChallenge,
   getOAuthRedirectUri,
+  getRequestOrigin,
   OAUTH_CODE_VERIFIER_COOKIE,
   OAUTH_REDIRECT_URI_COOKIE,
   OAUTH_SCOPES,
@@ -18,6 +19,17 @@ export async function GET(req: Request) {
   try {
     const clientId = getEnv("QURAN_CLIENT_ID");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
+    const configuredRedirectUri = process.env.QURAN_OAUTH_REDIRECT_URI?.trim();
+
+    if (configuredRedirectUri) {
+      const requestOrigin = getRequestOrigin(req);
+      const oauthOrigin = new URL(configuredRedirectUri).origin;
+
+      if (requestOrigin !== oauthOrigin) {
+        return NextResponse.redirect(new URL("/api/auth/login", oauthOrigin));
+      }
+    }
+
     const redirectUri = getOAuthRedirectUri(req);
     const state = randomOauthValue();
     const codeVerifier = randomOauthValue(64);

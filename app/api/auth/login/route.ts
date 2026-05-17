@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
 import {
   createCodeChallenge,
+  getConfiguredOAuthRedirectUri,
   getOAuthScopes,
-  getOAuthRedirectUri,
+  getOAuthRedirectUriCandidates,
+  getPreferredOAuthOrigin,
   getRequestOrigin,
   OAUTH_CODE_VERIFIER_COOKIE,
   OAUTH_NONCE_COOKIE,
@@ -30,67 +32,54 @@ type OAuthStartCheck =
       description: string;
     };
 
+type AuthorizationRequest = {
+  redirectUri: string;
+  url: URL;
+};
+
+type AuthorizationSelection =
+  | ({ ok: true } & AuthorizationRequest)
+  | ({
+      ok: false;
+    } & Exclude<OAuthStartCheck, { ok: true }>);
+
 export async function GET(req: Request) {
   try {
     const clientId = getEnv("QURAN_CLIENT_ID");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
-    const configuredRedirectUri =
-      process.env.QURAN_OAUTH_REDIRECT_URI?.trim() ||
-      process.env.QURAN_REDIRECT_URI?.trim();
     const requestOrigin = getRequestOrigin(req);
+    const preferredOAuthOrigin = getPreferredOAuthOrigin(req);
 
-    if (configuredRedirectUri) {
-      const oauthOrigin = new URL(configuredRedirectUri).origin;
-
-      if (requestOrigin !== oauthOrigin) {
-        return NextResponse.redirect(new URL("/api/auth/login", oauthOrigin));
-      }
+    if (requestOrigin !== preferredOAuthOrigin) {
+      return NextResponse.redirect(
+        new URL("/api/auth/login", preferredOAuthOrigin)
+      );
     }
 
-    const redirectUri = getOAuthRedirectUri(req);
     const state = randomOauthValue();
     const nonce = randomOauthValue(24);
     const codeVerifier = randomOauthValue(64);
     const codeChallenge = createCodeChallenge(codeVerifier);
     const scopes = getOAuthScopes();
-
-    const url = new URL("/oauth2/auth", baseUrl);
-    url.searchParams.set("response_type", "code");
-    url.searchParams.set("client_id", clientId);
-    url.searchParams.set("redirect_uri", redirectUri);
-    url.searchParams.set("code_challenge", codeChallenge);
-    url.searchParams.set("code_challenge_method", "S256");
-    url.searchParams.set("state", state);
-    url.searchParams.set("nonce", nonce);
-    url.searchParams.set("scope", scopes);
-
-    console.info("[oauth.login] Starting authorization request", {
-      providerOrigin: new URL(baseUrl).origin,
-      responseType: "code",
-      redirectUri,
+    const authorizationRequest = await selectAuthorizationRequest({
+      baseUrl,
+      clientId,
+      codeChallenge,
+      nonce,
+      req,
       scopes,
-      hasPkce: true,
-      clientId: redactValue(clientId),
-      authorizationUrl: redactUrlForLogs(url.toString()),
-      redirectUriFromEnv: Boolean(configuredRedirectUri),
+      state,
     });
 
-    const providerStart = await checkOAuthStart(url.toString());
-
-    if (!providerStart.ok) {
-      console.error("[oauth.login] OAuth provider rejected startup", {
-        providerOrigin: new URL(baseUrl).origin,
-        error: providerStart.error,
-        description: providerStart.description,
-        timeoutMs: OAUTH_START_TIMEOUT_MS,
-      });
-
+    if (!authorizationRequest.ok) {
       return redirectWithLoginError(
         req,
-        providerStart.error,
-        providerStart.description
+        authorizationRequest.error,
+        authorizationRequest.description
       );
     }
+
+    const { redirectUri, url } = authorizationRequest;
 
     const res = NextResponse.redirect(url);
     const cookieOptions = {
@@ -118,6 +107,101 @@ export async function GET(req: Request) {
       "Unable to start OAuth login."
     );
   }
+}
+
+async function selectAuthorizationRequest(input: {
+  baseUrl: string;
+  clientId: string;
+  codeChallenge: string;
+  nonce: string;
+  req: Request;
+  scopes: string;
+  state: string;
+}): Promise<AuthorizationSelection> {
+  const redirectUriCandidates = getOAuthRedirectUriCandidates(input.req);
+  const providerOrigin = new URL(input.baseUrl).origin;
+  const redirectUriFromEnv = Boolean(getConfiguredOAuthRedirectUri());
+  let lastProviderStart: Exclude<OAuthStartCheck, { ok: true }> | null = null;
+
+  for (const [index, redirectUri] of redirectUriCandidates.entries()) {
+    const url = createAuthorizationUrl({
+      baseUrl: input.baseUrl,
+      clientId: input.clientId,
+      codeChallenge: input.codeChallenge,
+      nonce: input.nonce,
+      redirectUri,
+      scopes: input.scopes,
+      state: input.state,
+    });
+
+    console.info("[oauth.login] Starting authorization request", {
+      providerOrigin,
+      responseType: "code",
+      redirectUri,
+      redirectUriCandidate: index + 1,
+      redirectUriCandidateCount: redirectUriCandidates.length,
+      scopes: input.scopes,
+      hasPkce: true,
+      clientId: redactValue(input.clientId),
+      authorizationUrl: redactUrlForLogs(url.toString()),
+      redirectUriFromEnv,
+    });
+
+    const providerStart = await checkOAuthStart(url.toString());
+
+    if (providerStart.ok) {
+      return {
+        ok: true,
+        redirectUri,
+        url,
+      };
+    }
+
+    lastProviderStart = providerStart;
+
+    console.error("[oauth.login] OAuth provider rejected startup", {
+      providerOrigin,
+      error: providerStart.error,
+      description: providerStart.description,
+      redirectUri,
+      timeoutMs: OAUTH_START_TIMEOUT_MS,
+    });
+
+    if (!isRedirectUriMismatch(providerStart)) {
+      return providerStart;
+    }
+  }
+
+  return (
+    lastProviderStart || {
+      ok: false,
+      error: "oauth_redirect_uri_rejected",
+      description:
+        "Quran.com rejected every configured OAuth callback URL for this app.",
+    }
+  );
+}
+
+function createAuthorizationUrl(input: {
+  baseUrl: string;
+  clientId: string;
+  codeChallenge: string;
+  nonce: string;
+  redirectUri: string;
+  scopes: string;
+  state: string;
+}): URL {
+  const url = new URL("/oauth2/auth", input.baseUrl);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("client_id", input.clientId);
+  url.searchParams.set("redirect_uri", input.redirectUri);
+  url.searchParams.set("code_challenge", input.codeChallenge);
+  url.searchParams.set("code_challenge_method", "S256");
+  url.searchParams.set("state", input.state);
+  url.searchParams.set("nonce", input.nonce);
+  url.searchParams.set("scope", input.scopes);
+
+  return url;
 }
 
 export async function POST(req: Request) {
@@ -204,6 +288,15 @@ function readProviderError(location: string | null): OAuthStartCheck | null {
       url.searchParams.get("error_description") ||
       "Quran.com sign-in could not be started. Please check the OAuth redirect URL.",
   };
+}
+
+function isRedirectUriMismatch(
+  providerStart: Exclude<OAuthStartCheck, { ok: true }>
+): boolean {
+  return (
+    providerStart.error === "invalid_request" &&
+    providerStart.description.toLowerCase().includes("redirect_uri")
+  );
 }
 
 function redirectWithLoginError(

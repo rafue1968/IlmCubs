@@ -8,6 +8,7 @@ export const OAUTH_NONCE_COOKIE = "quran_oauth_nonce";
 const DEFAULT_OAUTH_SCOPES = "openid offline_access user reading_session streak";
 
 const DEFAULT_CALLBACK_PATH = "/api/auth/callback";
+const FALLBACK_CALLBACK_PATHS = ["/callback", "/oauth/callback"];
 
 export function randomOauthValue(byteLength = 32): string {
   return randomBytes(byteLength).toString("base64url");
@@ -18,7 +19,7 @@ export function createCodeChallenge(codeVerifier: string): string {
 }
 
 export function getOAuthScopes(): string {
-  return process.env.QURAN_OAUTH_SCOPES?.trim() || DEFAULT_OAUTH_SCOPES;
+  return readCleanEnv("QURAN_OAUTH_SCOPES") || DEFAULT_OAUTH_SCOPES;
 }
 
 export function getRequestOrigin(req: Request): string {
@@ -39,26 +40,55 @@ export function getRequestOrigin(req: Request): string {
 }
 
 export function getOAuthRedirectUri(req: Request): string {
-  const configuredRedirectUri =
-    process.env.QURAN_OAUTH_REDIRECT_URI?.trim() ||
-    process.env.QURAN_REDIRECT_URI?.trim();
+  return getOAuthRedirectUriCandidates(req)[0];
+}
+
+export function getOAuthRedirectUriCandidates(req: Request): string[] {
+  const configuredRedirectUri = getConfiguredOAuthRedirectUri();
+
+  if (configuredRedirectUri) {
+    return [normalizeRedirectUri(configuredRedirectUri)];
+  }
+
+  const requestOrigin = getRequestOrigin(req);
   const siteOrigin = getConfiguredSiteOrigin();
+  const origins = uniqueValues([
+    siteOrigin,
+    getCanonicalRequestOrigin(requestOrigin),
+    requestOrigin,
+  ]);
   const callbackPath =
     process.env.QURAN_OAUTH_CALLBACK_PATH?.trim() || DEFAULT_CALLBACK_PATH;
-  const redirectUri =
-    configuredRedirectUri ||
-    new URL(callbackPath, siteOrigin || getRequestOrigin(req)).toString();
+  const paths = uniqueValues([
+    callbackPath,
+    DEFAULT_CALLBACK_PATH,
+    ...FALLBACK_CALLBACK_PATHS,
+  ]);
 
-  return redirectUri.replace(/\/$/, "");
+  return origins.flatMap((origin) =>
+    paths.map((path) => normalizeRedirectUri(new URL(path, origin).toString()))
+  );
+}
+
+export function getPreferredOAuthOrigin(req: Request): string {
+  return new URL(getOAuthRedirectUri(req)).origin;
+}
+
+export function getConfiguredOAuthRedirectUri(): string | null {
+  return (
+    readCleanEnv("QURAN_OAUTH_REDIRECT_URI") ||
+    readCleanEnv("QURAN_REDIRECT_URI") ||
+    null
+  );
 }
 
 function getConfiguredSiteOrigin(): string | null {
   const configuredOrigin =
-    process.env.QURAN_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() ||
-    process.env.VERCEL_URL?.trim();
+    readCleanEnv("QURAN_APP_URL") ||
+    readCleanEnv("NEXT_PUBLIC_APP_URL") ||
+    readCleanEnv("NEXT_PUBLIC_SITE_URL") ||
+    readCleanEnv("VERCEL_PROJECT_PRODUCTION_URL") ||
+    readCleanEnv("VERCEL_URL");
 
   if (!configuredOrigin) {
     return null;
@@ -69,6 +99,43 @@ function getConfiguredSiteOrigin(): string | null {
     : `https://${configuredOrigin}`;
 
   return new URL(originWithProtocol).origin;
+}
+
+function getCanonicalRequestOrigin(origin: string): string {
+  const url = new URL(origin);
+
+  if (url.hostname === "127.0.0.1" || url.hostname === "[::1]") {
+    url.hostname = "localhost";
+  }
+
+  return url.origin;
+}
+
+function normalizeRedirectUri(uri: string): string {
+  return uri.replace(/\/$/, "");
+}
+
+function uniqueValues(values: Array<string | null | undefined>): string[] {
+  return Array.from(
+    new Set(values.filter((value): value is string => Boolean(value)))
+  );
+}
+
+function readCleanEnv(name: string): string {
+  const value = process.env[name];
+
+  if (!value) {
+    return "";
+  }
+
+  const trimmed = value.trim();
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1).trim()
+      : trimmed;
+
+  return unquoted.replace(/\\r|\\n/g, "").trim();
 }
 
 export function getCookieValue(req: Request, name: string): string | null {

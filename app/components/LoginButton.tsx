@@ -2,14 +2,23 @@
 
 type Props = {
   className?: string;
+  href?: string;
   onClickStart?: () => void;
+  testId?: string;
   children?: string;
 };
 
-export default function LoginButton({ className, onClickStart, children }: Props) {
+export default function LoginButton({
+  className,
+  href = "/api/auth/login",
+  onClickStart,
+  testId,
+  children,
+}: Props) {
   return (
     <a
-      href="/api/auth/login"
+      href={href}
+      data-testid={testId}
       onClick={() => {
         onClickStart?.();
       }}

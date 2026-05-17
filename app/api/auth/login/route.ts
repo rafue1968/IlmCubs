@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
 import {
   createCodeChallenge,
+  getOAuthScopes,
   getOAuthRedirectUri,
   getRequestOrigin,
   OAUTH_CODE_VERIFIER_COOKIE,
   OAUTH_REDIRECT_URI_COOKIE,
-  OAUTH_SCOPES,
   OAUTH_STATE_COOKIE,
   randomOauthValue,
   redactUrlForLogs,
@@ -14,6 +14,8 @@ import {
 } from "@/app/lib/oauth-server";
 
 const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
+
+export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   try {
@@ -34,21 +36,22 @@ export async function GET(req: Request) {
     const state = randomOauthValue();
     const codeVerifier = randomOauthValue(64);
     const codeChallenge = createCodeChallenge(codeVerifier);
+    const scopes = getOAuthScopes();
 
-    const url = new URL(`${baseUrl}/oauth2/auth`);
+    const url = new URL("/oauth2/auth", baseUrl);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("code_challenge", codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("state", state);
-    url.searchParams.set("scope", OAUTH_SCOPES);
+    url.searchParams.set("scope", scopes);
 
     console.info("[oauth.login] Starting authorization request", {
       providerOrigin: new URL(baseUrl).origin,
       responseType: "code",
       redirectUri,
-      scopes: OAUTH_SCOPES,
+      scopes,
       hasPkce: true,
       clientId: redactValue(clientId),
       authorizationUrl: redactUrlForLogs(url.toString()),

@@ -4,7 +4,7 @@ export const OAUTH_STATE_COOKIE = "quran_oauth_state";
 export const OAUTH_CODE_VERIFIER_COOKIE = "quran_pkce_code_verifier";
 export const OAUTH_REDIRECT_URI_COOKIE = "quran_oauth_redirect_uri";
 
-export const OAUTH_SCOPES = "openid offline_access user streak";
+const DEFAULT_OAUTH_SCOPES = "openid offline_access user reading_session streak";
 
 const CALLBACK_PATH = "/oauth/callback";
 
@@ -14,6 +14,10 @@ export function randomOauthValue(byteLength = 32): string {
 
 export function createCodeChallenge(codeVerifier: string): string {
   return createHash("sha256").update(codeVerifier).digest("base64url");
+}
+
+export function getOAuthScopes(): string {
+  return process.env.QURAN_OAUTH_SCOPES?.trim() || DEFAULT_OAUTH_SCOPES;
 }
 
 export function getRequestOrigin(req: Request): string {

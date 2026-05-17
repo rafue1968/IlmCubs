@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LoginButton from "../../components/LoginButton";
 
+const CALLBACK_EXCHANGE_TIMEOUT_MS = 10_000;
+
 export default function OAuthCallbackPage() {
   const [message, setMessage] = useState("Logging you in...");
 
@@ -45,6 +47,12 @@ export default function OAuthCallbackPage() {
       }
 
       try {
+        const controller = new AbortController();
+        const timeout = window.setTimeout(
+          () => controller.abort(),
+          CALLBACK_EXCHANGE_TIMEOUT_MS
+        );
+
         const res = await fetch("/api/auth/callback", {
           method: "POST",
           headers: {
@@ -55,7 +63,8 @@ export default function OAuthCallbackPage() {
             code,
             state: returnedState,
           }),
-        });
+          signal: controller.signal,
+        }).finally(() => window.clearTimeout(timeout));
 
         const data = await res.json().catch(() => null);
 
@@ -70,6 +79,11 @@ export default function OAuthCallbackPage() {
 
         window.location.href = "/";
       } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          setMessage("Login is taking too long. Please try signing in again.");
+          return;
+        }
+
         setMessage(
           error instanceof Error ? error.message : "Login failed unexpectedly."
         );

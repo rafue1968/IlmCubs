@@ -118,7 +118,11 @@ export default function HomePage() {
                   Open StoryTime
                 </Link>
 
-                <LoginButton className="inline-flex rounded-full border-4 border-white/70 bg-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] transition hover:bg-emerald-200 focus:outline-none focus:ring-4 focus:ring-white/70">
+                <LoginButton
+                  href="/api/auth/login"
+                  testId="home-quran-oauth-login"
+                  className="inline-flex rounded-full border-4 border-white/70 bg-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] transition hover:bg-emerald-200 focus:outline-none focus:ring-4 focus:ring-white/70"
+                >
                   Sign in with Quran.com
                 </LoginButton>
               </div>

@@ -10,26 +10,120 @@ import {
 } from "@/app/lib/oauth-server";
 
 type CallbackRequest = {
-  code?: string;
-  state?: string;
+  code?: string | null;
+  state?: string | null;
 };
+
+type CallbackMode = "json" | "redirect";
+
+type TokenResponsePayload = {
+  access_token?: unknown;
+  refresh_token?: unknown;
+  expires_in?: unknown;
+  [key: string]: unknown;
+};
+
+const TOKEN_EXCHANGE_TIMEOUT_MS = readPositiveIntegerEnv(
+  "QURAN_OAUTH_TOKEN_TIMEOUT_MS",
+  8_000
+);
+
+export const runtime = "nodejs";
+
+class OAuthTokenExchangeTimeoutError extends Error {
+  constructor(readonly timeoutMs: number) {
+    super(`OAuth token exchange timed out after ${timeoutMs}ms`);
+    this.name = "OAuthTokenExchangeTimeoutError";
+  }
+}
 
 function basicAuthHeader(clientId: string, clientSecret: string) {
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   return `Basic ${credentials}`;
 }
 
-export async function POST(req: Request) {
+export async function GET(req: Request) {
   try {
-    const body = (await req.json()) as CallbackRequest;
+    const url = new URL(req.url);
+    const providerError = url.searchParams.get("error");
+
+    if (providerError) {
+      return clearOAuthCookies(
+        redirectWithOAuthError(
+          req,
+          providerError,
+          url.searchParams.get("error_description") ||
+            `OAuth provider returned an error: ${providerError}`
+        )
+      );
+    }
+
+    return completeOAuthCallback(
+      req,
+      {
+        code: url.searchParams.get("code"),
+        state: url.searchParams.get("state"),
+      },
+      {
+        callbackUrl: req.url,
+        mode: "redirect",
+      }
+    );
+  } catch (error) {
+    console.error("[oauth.callback] Unexpected GET callback failure", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+
+    return clearOAuthCookies(
+      redirectWithOAuthError(
+        req,
+        "callback_failed",
+        error instanceof Error ? error.message : "Unexpected callback error"
+      )
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  let body: CallbackRequest;
+
+  try {
+    body = (await req.json()) as CallbackRequest;
+  } catch {
+    return clearOAuthCookies(
+      NextResponse.json(
+        {
+          success: false,
+          message: "Invalid callback request body",
+        },
+        { status: 400 }
+      )
+    );
+  }
+
+  return completeOAuthCallback(req, body, {
+    callbackUrl: req.headers.get("referer") || req.url,
+    mode: "json",
+  });
+}
+
+async function completeOAuthCallback(
+  req: Request,
+  body: CallbackRequest,
+  options: {
+    callbackUrl: string;
+    mode: CallbackMode;
+  }
+) {
+  try {
     const cookieState = getCookieValue(req, OAUTH_STATE_COOKIE);
     const codeVerifier = getCookieValue(req, OAUTH_CODE_VERIFIER_COOKIE);
     const redirectUri = getCookieValue(req, OAUTH_REDIRECT_URI_COOKIE);
-    const callbackUrl = req.headers.get("referer") || req.url;
 
     console.info("[oauth.callback] Received callback exchange request", {
-      callbackUrl: redactUrlForLogs(callbackUrl),
-      queryParamNames: Array.from(new URL(callbackUrl).searchParams.keys()),
+      callbackUrl: redactUrlForLogs(options.callbackUrl),
+      mode: options.mode,
+      queryParamNames: getQueryParamNames(options.callbackUrl),
       hasCode: Boolean(body.code),
       hasReturnedState: Boolean(body.state),
       hasStoredState: Boolean(cookieState),
@@ -38,48 +132,46 @@ export async function POST(req: Request) {
     });
 
     if (!body.code) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "Missing authorization code",
-        },
-        { status: 400 }
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "Missing authorization code",
+        "missing_authorization_code"
       );
     }
 
     if (!body.state || !cookieState || body.state !== decodeURIComponent(cookieState)) {
-      return clearOAuthCookies(
-        NextResponse.json(
-          {
-            success: false,
-            message: "Invalid OAuth state",
-          },
-          { status: 400 }
-        )
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "Invalid OAuth state",
+        "invalid_oauth_state"
       );
     }
 
     if (!codeVerifier || !redirectUri) {
-      return clearOAuthCookies(
-        NextResponse.json(
-          {
-            success: false,
-            message: "OAuth login session expired. Please try signing in again.",
-          },
-          { status: 400 }
-        )
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "OAuth login session expired. Please try signing in again.",
+        "oauth_session_expired"
       );
     }
 
     const clientId = getEnv("QURAN_CLIENT_ID");
     const clientSecret = getEnv("QURAN_CLIENT_SECRET");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
+    const tokenEndpoint = new URL("/oauth2/token", baseUrl).toString();
 
     console.info("[oauth.callback] Exchanging authorization code", {
-      tokenEndpoint: new URL("/oauth2/token", baseUrl).toString(),
+      tokenEndpoint,
       redirectUri: decodeURIComponent(redirectUri),
       clientId: redactValue(clientId),
       hasClientSecret: Boolean(clientSecret),
+      timeoutMs: TOKEN_EXCHANGE_TIMEOUT_MS,
     });
 
     const form = new URLSearchParams({
@@ -89,20 +181,49 @@ export async function POST(req: Request) {
       code_verifier: decodeURIComponent(codeVerifier),
     });
 
-    const tokenRes = await fetch(`${baseUrl}/oauth2/token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Authorization: basicAuthHeader(clientId, clientSecret),
-      },
-      body: form,
-    });
+    let tokenRes: Response;
+
+    try {
+      tokenRes = await postTokenRequest(tokenEndpoint, form, clientId, clientSecret);
+    } catch (error) {
+      if (error instanceof OAuthTokenExchangeTimeoutError) {
+        console.error("[oauth.callback] Token exchange timed out", {
+          tokenEndpoint,
+          timeoutMs: error.timeoutMs,
+        });
+
+        return oauthFailureResponse(
+          req,
+          options.mode,
+          502,
+          "OAuth token exchange timed out. Please try signing in again.",
+          "token_exchange_timeout"
+        );
+      }
+
+      if (error instanceof TypeError) {
+        console.error("[oauth.callback] Token endpoint network failure", {
+          tokenEndpoint,
+          message: error.message,
+        });
+
+        return oauthFailureResponse(
+          req,
+          options.mode,
+          502,
+          "Could not reach the OAuth token endpoint. Please try signing in again.",
+          "token_exchange_network_error"
+        );
+      }
+
+      throw error;
+    }
 
     const rawText = await tokenRes.text();
 
-    let data: Record<string, unknown>;
+    let data: TokenResponsePayload;
     try {
-      data = JSON.parse(rawText) as Record<string, unknown>;
+      data = JSON.parse(rawText) as TokenResponsePayload;
     } catch {
       data = { raw: rawText };
     }
@@ -118,16 +239,16 @@ export async function POST(req: Request) {
             : undefined,
       });
 
-      return clearOAuthCookies(
-        NextResponse.json(
-          {
-            success: false,
-            message: "Token exchange failed",
-            upstreamStatus: tokenRes.status,
-            upstream: data,
-          },
-          { status: 400 }
-        )
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "Token exchange failed",
+        "token_exchange_failed",
+        {
+          upstreamStatus: tokenRes.status,
+          upstream: data,
+        }
       );
     }
 
@@ -136,19 +257,22 @@ export async function POST(req: Request) {
     const expiresIn = data.expires_in;
 
     if (typeof accessToken !== "string" || !accessToken) {
-      return clearOAuthCookies(
-        NextResponse.json(
-          {
-            success: false,
-            message: "No access token returned",
-            upstream: data,
-          },
-          { status: 400 }
-        )
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "No access token returned",
+        "missing_access_token",
+        {
+          upstream: data,
+        }
       );
     }
 
-    const res = NextResponse.json({ success: true });
+    const res =
+      options.mode === "redirect"
+        ? NextResponse.redirect(new URL("/", req.url))
+        : NextResponse.json({ success: true });
     clearOAuthCookies(res);
 
     res.cookies.set("quran_access_token", accessToken, {
@@ -156,7 +280,9 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      ...(typeof expiresIn === "number" ? { maxAge: expiresIn } : {}),
+      ...(readExpiresInSeconds(expiresIn)
+        ? { maxAge: readExpiresInSeconds(expiresIn) }
+        : {}),
     });
 
     if (typeof refreshToken === "string" && refreshToken) {
@@ -174,15 +300,117 @@ export async function POST(req: Request) {
       message: error instanceof Error ? error.message : "Unknown error",
     });
 
-    return NextResponse.json(
-      {
-        success: false,
-        message:
-          error instanceof Error ? error.message : "Unexpected callback error",
-      },
-      { status: 500 }
+    return oauthFailureResponse(
+      req,
+      options.mode,
+      500,
+      error instanceof Error ? error.message : "Unexpected callback error",
+      "callback_failed"
     );
   }
+}
+
+async function postTokenRequest(
+  tokenEndpoint: string,
+  form: URLSearchParams,
+  clientId: string,
+  clientSecret: string
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(),
+    TOKEN_EXCHANGE_TIMEOUT_MS
+  );
+
+  try {
+    return await fetch(tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: basicAuthHeader(clientId, clientSecret),
+      },
+      body: form,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new OAuthTokenExchangeTimeoutError(TOKEN_EXCHANGE_TIMEOUT_MS);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function oauthFailureResponse(
+  req: Request,
+  mode: CallbackMode,
+  status: number,
+  message: string,
+  errorCode: string,
+  extra?: Record<string, unknown>
+) {
+  if (mode === "redirect") {
+    return clearOAuthCookies(redirectWithOAuthError(req, errorCode, message));
+  }
+
+  return clearOAuthCookies(
+    NextResponse.json(
+      {
+        success: false,
+        message,
+        ...extra,
+      },
+      { status }
+    )
+  );
+}
+
+function redirectWithOAuthError(
+  req: Request,
+  error: string,
+  description: string
+): NextResponse {
+  const url = new URL("/oauth/callback", req.url);
+  url.searchParams.set("error", error);
+  url.searchParams.set("error_description", description);
+
+  return NextResponse.redirect(url);
+}
+
+function getQueryParamNames(url: string): string[] {
+  try {
+    return Array.from(new URL(url).searchParams.keys());
+  } catch {
+    return [];
+  }
+}
+
+function readExpiresInSeconds(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    const parsed = Number(value);
+    return parsed > 0 ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function clearOAuthCookies(res: NextResponse): NextResponse {

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import LoginButton from "./components/LoginButton";
+import {
+  getQuranOAuthProfile,
+  type QuranOAuthProfile,
+} from "./lib/quran-oauth-session";
 
 export const metadata: Metadata = {
   title: "IlmCubs Homepage",
@@ -81,6 +86,64 @@ function ActivityCard(props: {
   );
 }
 
+function HomeQuranLoginButton() {
+  return (
+    <LoginButton
+      href="/api/auth/login"
+      testId="home-quran-oauth-login"
+      className="inline-flex rounded-full border-4 border-white/70 bg-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] transition hover:bg-emerald-200 focus:outline-none focus:ring-4 focus:ring-white/70"
+    >
+      Sign in with Quran.com
+    </LoginButton>
+  );
+}
+
+function QuranProfilePill({ profile }: { profile: QuranOAuthProfile }) {
+  return (
+    <div
+      data-testid="home-quran-oauth-profile"
+      className="inline-flex min-h-[52px] items-center gap-3 rounded-full border-4 border-white/70 bg-white/70 py-2 pl-2 pr-5 text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] backdrop-blur"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-300 text-sm font-black text-slate-950 ring-2 ring-white/80">
+        {profile.initials}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
+          Quran.com connected
+        </span>
+        <span className="block max-w-[220px] truncate text-sm font-extrabold text-slate-950">
+          {profile.displayName}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function HomeQuranStatusFallback() {
+  return (
+    <div
+      aria-hidden="true"
+      className="inline-flex min-h-[52px] w-[236px] animate-pulse items-center gap-3 rounded-full border-4 border-white/70 bg-white/45 py-2 pl-2 pr-5 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] backdrop-blur"
+    >
+      <span className="h-10 w-10 rounded-full bg-white/70" />
+      <span className="space-y-1.5">
+        <span className="block h-2.5 w-24 rounded-full bg-white/70" />
+        <span className="block h-3 w-32 rounded-full bg-white/70" />
+      </span>
+    </div>
+  );
+}
+
+async function HomeQuranAuthStatus() {
+  const profile = await getQuranOAuthProfile();
+
+  if (!profile) {
+    return <HomeQuranLoginButton />;
+  }
+
+  return <QuranProfilePill profile={profile} />;
+}
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-sky-200 via-emerald-100 to-yellow-100 px-5 py-8 sm:py-10">
@@ -118,13 +181,9 @@ export default function HomePage() {
                   Open StoryTime
                 </Link>
 
-                <LoginButton
-                  href="/api/auth/login"
-                  testId="home-quran-oauth-login"
-                  className="inline-flex rounded-full border-4 border-white/70 bg-emerald-300 px-6 py-3 text-sm font-extrabold text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] transition hover:bg-emerald-200 focus:outline-none focus:ring-4 focus:ring-white/70"
-                >
-                  Sign in with Quran.com
-                </LoginButton>
+                <Suspense fallback={<HomeQuranStatusFallback />}>
+                  <HomeQuranAuthStatus />
+                </Suspense>
               </div>
 
               <div className="mt-6 flex flex-wrap gap-3">

@@ -22,14 +22,19 @@ export function getOAuthScopes(): string {
 
 export function getRequestOrigin(req: Request): string {
   const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const forwardedProto =
-    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  const requestUrl = new URL(req.url);
+  const forwardedProto = req.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim();
+  const proto = forwardedProto || requestUrl.protocol.replace(":", "") || "https";
+  const host = forwardedHost || req.headers.get("host")?.trim();
 
-  if (forwardedHost) {
-    return `${forwardedProto}://${forwardedHost}`;
+  if (host) {
+    return `${proto}://${host}`;
   }
 
-  return new URL(req.url).origin;
+  return requestUrl.origin;
 }
 
 export function getOAuthRedirectUri(req: Request): string {

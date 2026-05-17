@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
 import {
+  createQuranOAuthProfileCookieValue,
+  QURAN_ACCESS_TOKEN_COOKIE,
+  QURAN_OAUTH_PROFILE_COOKIE,
+  QURAN_REFRESH_TOKEN_COOKIE,
+} from "@/app/lib/quran-oauth-session";
+import {
+  getRequestOrigin,
   getCookieValue,
   OAUTH_CODE_VERIFIER_COOKIE,
   OAUTH_REDIRECT_URI_COOKIE,
@@ -20,6 +27,7 @@ type TokenResponsePayload = {
   access_token?: unknown;
   refresh_token?: unknown;
   expires_in?: unknown;
+  id_token?: unknown;
   [key: string]: unknown;
 };
 
@@ -255,6 +263,8 @@ async function completeOAuthCallback(
     const accessToken = data.access_token;
     const refreshToken = data.refresh_token;
     const expiresIn = data.expires_in;
+    const tokenMaxAge = readExpiresInSeconds(expiresIn);
+    const profileCookieValue = createQuranOAuthProfileCookieValue(data.id_token);
 
     if (typeof accessToken !== "string" || !accessToken) {
       return oauthFailureResponse(
@@ -271,26 +281,42 @@ async function completeOAuthCallback(
 
     const res =
       options.mode === "redirect"
-        ? NextResponse.redirect(new URL("/", req.url))
+        ? NextResponse.redirect(new URL("/", getRequestOrigin(req)))
         : NextResponse.json({ success: true });
     clearOAuthCookies(res);
 
-    res.cookies.set("quran_access_token", accessToken, {
+    res.cookies.set(QURAN_ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      ...(readExpiresInSeconds(expiresIn)
-        ? { maxAge: readExpiresInSeconds(expiresIn) }
-        : {}),
+      ...(tokenMaxAge ? { maxAge: tokenMaxAge } : {}),
     });
 
     if (typeof refreshToken === "string" && refreshToken) {
-      res.cookies.set("quran_refresh_token", refreshToken, {
+      res.cookies.set(QURAN_REFRESH_TOKEN_COOKIE, refreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",
+      });
+    }
+
+    if (profileCookieValue) {
+      res.cookies.set(QURAN_OAUTH_PROFILE_COOKIE, profileCookieValue, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        ...(tokenMaxAge ? { maxAge: tokenMaxAge } : {}),
+      });
+    } else {
+      res.cookies.set(QURAN_OAUTH_PROFILE_COOKIE, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
       });
     }
 
@@ -373,7 +399,7 @@ function redirectWithOAuthError(
   error: string,
   description: string
 ): NextResponse {
-  const url = new URL("/oauth/callback", req.url);
+  const url = new URL("/oauth/callback", getRequestOrigin(req));
   url.searchParams.set("error", error);
   url.searchParams.set("error_description", description);
 

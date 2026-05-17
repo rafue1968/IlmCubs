@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-
-const ACCESS_TOKEN_COOKIE = "quran_access_token";
-const REFRESH_TOKEN_COOKIE = "quran_refresh_token";
+import {
+  QURAN_ACCESS_TOKEN_COOKIE,
+  QURAN_OAUTH_PROFILE_COOKIE,
+  QURAN_REFRESH_TOKEN_COOKIE,
+} from "@/app/lib/quran-oauth-session";
 
 export type AuthSession = {
   accessToken: string;
@@ -12,13 +14,13 @@ export type AuthSession = {
 
 export async function getAuthSession(): Promise<AuthSession | null> {
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+  const accessToken = cookieStore.get(QURAN_ACCESS_TOKEN_COOKIE)?.value;
 
   if (!accessToken) {
     return null;
   }
 
-  const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
+  const refreshToken = cookieStore.get(QURAN_REFRESH_TOKEN_COOKIE)?.value;
 
   return {
     accessToken,
@@ -29,7 +31,7 @@ export async function getAuthSession(): Promise<AuthSession | null> {
 export async function setAuthSession(session: AuthSession): Promise<void> {
   const cookieStore = await cookies();
 
-  cookieStore.set(ACCESS_TOKEN_COOKIE, session.accessToken, {
+  cookieStore.set(QURAN_ACCESS_TOKEN_COOKIE, session.accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -38,7 +40,7 @@ export async function setAuthSession(session: AuthSession): Promise<void> {
   });
 
   if (session.refreshToken) {
-    cookieStore.set(REFRESH_TOKEN_COOKIE, session.refreshToken, {
+    cookieStore.set(QURAN_REFRESH_TOKEN_COOKIE, session.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -51,8 +53,9 @@ export async function setAuthSession(session: AuthSession): Promise<void> {
 export async function clearAuthSession(): Promise<void> {
   const cookieStore = await cookies();
 
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
+  cookieStore.delete(QURAN_ACCESS_TOKEN_COOKIE);
+  cookieStore.delete(QURAN_REFRESH_TOKEN_COOKIE);
+  cookieStore.delete(QURAN_OAUTH_PROFILE_COOKIE);
 }
 
 export async function requireAuth(): Promise<AuthSession> {

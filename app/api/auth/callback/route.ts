@@ -10,6 +10,7 @@ import {
   getRequestOrigin,
   getCookieValue,
   OAUTH_CODE_VERIFIER_COOKIE,
+  OAUTH_NONCE_COOKIE,
   OAUTH_REDIRECT_URI_COOKIE,
   OAUTH_STATE_COOKIE,
   redactUrlForLogs,
@@ -442,6 +443,7 @@ function readPositiveIntegerEnv(name: string, fallback: number): number {
 function clearOAuthCookies(res: NextResponse): NextResponse {
   for (const name of [
     OAUTH_STATE_COOKIE,
+    OAUTH_NONCE_COOKIE,
     OAUTH_CODE_VERIFIER_COOKIE,
     OAUTH_REDIRECT_URI_COOKIE,
   ]) {

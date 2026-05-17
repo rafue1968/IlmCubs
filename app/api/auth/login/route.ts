@@ -6,6 +6,7 @@ import {
   getOAuthRedirectUri,
   getRequestOrigin,
   OAUTH_CODE_VERIFIER_COOKIE,
+  OAUTH_NONCE_COOKIE,
   OAUTH_REDIRECT_URI_COOKIE,
   OAUTH_STATE_COOKIE,
   randomOauthValue,
@@ -21,11 +22,21 @@ const OAUTH_START_TIMEOUT_MS = readPositiveIntegerEnv(
 
 export const runtime = "nodejs";
 
+type OAuthStartCheck =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      description: string;
+    };
+
 export async function GET(req: Request) {
   try {
     const clientId = getEnv("QURAN_CLIENT_ID");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
-    const configuredRedirectUri = process.env.QURAN_OAUTH_REDIRECT_URI?.trim();
+    const configuredRedirectUri =
+      process.env.QURAN_OAUTH_REDIRECT_URI?.trim() ||
+      process.env.QURAN_REDIRECT_URI?.trim();
     const requestOrigin = getRequestOrigin(req);
 
     if (configuredRedirectUri) {
@@ -38,6 +49,7 @@ export async function GET(req: Request) {
 
     const redirectUri = getOAuthRedirectUri(req);
     const state = randomOauthValue();
+    const nonce = randomOauthValue(24);
     const codeVerifier = randomOauthValue(64);
     const codeChallenge = createCodeChallenge(codeVerifier);
     const scopes = getOAuthScopes();
@@ -49,6 +61,7 @@ export async function GET(req: Request) {
     url.searchParams.set("code_challenge", codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("state", state);
+    url.searchParams.set("nonce", nonce);
     url.searchParams.set("scope", scopes);
 
     console.info("[oauth.login] Starting authorization request", {
@@ -59,21 +72,23 @@ export async function GET(req: Request) {
       hasPkce: true,
       clientId: redactValue(clientId),
       authorizationUrl: redactUrlForLogs(url.toString()),
-      redirectUriFromEnv: Boolean(process.env.QURAN_OAUTH_REDIRECT_URI?.trim()),
+      redirectUriFromEnv: Boolean(configuredRedirectUri),
     });
 
-    const providerAvailable = await canReachOAuthProvider(url.toString());
+    const providerStart = await checkOAuthStart(url.toString());
 
-    if (!providerAvailable) {
-      console.error("[oauth.login] OAuth provider unavailable during startup", {
+    if (!providerStart.ok) {
+      console.error("[oauth.login] OAuth provider rejected startup", {
         providerOrigin: new URL(baseUrl).origin,
+        error: providerStart.error,
+        description: providerStart.description,
         timeoutMs: OAUTH_START_TIMEOUT_MS,
       });
 
       return redirectWithLoginError(
         req,
-        "oauth_provider_unavailable",
-        "Quran.com sign-in is temporarily unavailable. Please try again."
+        providerStart.error,
+        providerStart.description
       );
     }
 
@@ -87,6 +102,7 @@ export async function GET(req: Request) {
     };
 
     res.cookies.set(OAUTH_STATE_COOKIE, state, cookieOptions);
+    res.cookies.set(OAUTH_NONCE_COOKIE, nonce, cookieOptions);
     res.cookies.set(OAUTH_CODE_VERIFIER_COOKIE, codeVerifier, cookieOptions);
     res.cookies.set(OAUTH_REDIRECT_URI_COOKIE, redirectUri, cookieOptions);
 
@@ -124,7 +140,9 @@ export async function POST(req: Request) {
   }
 }
 
-async function canReachOAuthProvider(authorizationUrl: string): Promise<boolean> {
+async function checkOAuthStart(
+  authorizationUrl: string
+): Promise<OAuthStartCheck> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OAUTH_START_TIMEOUT_MS);
 
@@ -136,12 +154,56 @@ async function canReachOAuthProvider(authorizationUrl: string): Promise<boolean>
       signal: controller.signal,
     });
 
-    return res.status < 500;
+    if (res.status >= 500) {
+      return {
+        ok: false,
+        error: "oauth_provider_unavailable",
+        description: "Quran.com sign-in is temporarily unavailable. Please try again.",
+      };
+    }
+
+    const providerError = readProviderError(res.headers.get("location"));
+
+    if (providerError) {
+      return providerError;
+    }
+
+    return { ok: true };
   } catch {
-    return false;
+    return {
+      ok: false,
+      error: "oauth_provider_unavailable",
+      description: "Quran.com sign-in is temporarily unavailable. Please try again.",
+    };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function readProviderError(location: string | null): OAuthStartCheck | null {
+  if (!location) {
+    return null;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(location);
+  } catch {
+    return null;
+  }
+
+  if (!url.pathname.includes("oauth-error")) {
+    return null;
+  }
+
+  return {
+    ok: false,
+    error: url.searchParams.get("error") || "oauth_provider_error",
+    description:
+      url.searchParams.get("error_description") ||
+      "Quran.com sign-in could not be started. Please check the OAuth redirect URL.",
+  };
 }
 
 function redirectWithLoginError(

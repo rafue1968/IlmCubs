@@ -102,12 +102,12 @@ function QuranProfilePill({ profile }: { profile: QuranOAuthProfile }) {
   return (
     <div
       data-testid="home-quran-oauth-profile"
-      className="inline-flex min-h-[52px] items-center gap-3 rounded-full border-4 border-white/70 bg-white/70 py-2 pl-2 pr-5 text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] backdrop-blur"
+      className="inline-flex min-h-[52px] flex-wrap items-center gap-3 rounded-full border-4 border-white/70 bg-white/70 py-2 pl-2 pr-2 text-slate-950 shadow-[0_14px_30px_-20px_rgba(2,6,23,0.7)] backdrop-blur"
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-300 text-sm font-black text-slate-950 ring-2 ring-white/80">
         {profile.initials}
       </span>
-      <span className="min-w-0">
+      <span className="min-w-0 pr-1">
         <span className="block text-xs font-black uppercase tracking-[0.18em] text-emerald-700">
           Quran.com connected
         </span>
@@ -115,6 +115,13 @@ function QuranProfilePill({ profile }: { profile: QuranOAuthProfile }) {
           {profile.displayName}
         </span>
       </span>
+      <a
+        href="/api/auth/logout"
+        data-testid="home-quran-oauth-logout"
+        className="rounded-full bg-slate-900 px-4 py-2 text-xs font-black text-white transition hover:bg-slate-800 focus:outline-none focus:ring-4 focus:ring-white/70"
+      >
+        Sign out
+      </a>
     </div>
   );
 }

@@ -14,6 +14,10 @@ import {
 } from "@/app/lib/oauth-server";
 
 const OAUTH_COOKIE_MAX_AGE_SECONDS = 10 * 60;
+const OAUTH_START_TIMEOUT_MS = readPositiveIntegerEnv(
+  "QURAN_OAUTH_START_TIMEOUT_MS",
+  5_000
+);
 
 export const runtime = "nodejs";
 
@@ -22,9 +26,9 @@ export async function GET(req: Request) {
     const clientId = getEnv("QURAN_CLIENT_ID");
     const baseUrl = getEnv("QURAN_OAUTH_BASE_URL");
     const configuredRedirectUri = process.env.QURAN_OAUTH_REDIRECT_URI?.trim();
+    const requestOrigin = getRequestOrigin(req);
 
     if (configuredRedirectUri) {
-      const requestOrigin = getRequestOrigin(req);
       const oauthOrigin = new URL(configuredRedirectUri).origin;
 
       if (requestOrigin !== oauthOrigin) {
@@ -58,6 +62,21 @@ export async function GET(req: Request) {
       redirectUriFromEnv: Boolean(process.env.QURAN_OAUTH_REDIRECT_URI?.trim()),
     });
 
+    const providerAvailable = await canReachOAuthProvider(url.toString());
+
+    if (!providerAvailable) {
+      console.error("[oauth.login] OAuth provider unavailable during startup", {
+        providerOrigin: new URL(baseUrl).origin,
+        timeoutMs: OAUTH_START_TIMEOUT_MS,
+      });
+
+      return redirectWithLoginError(
+        req,
+        "oauth_provider_unavailable",
+        "Quran.com sign-in is temporarily unavailable. Please try again."
+      );
+    }
+
     const res = NextResponse.redirect(url);
     const cookieOptions = {
       httpOnly: true,
@@ -77,13 +96,10 @@ export async function GET(req: Request) {
       message: error instanceof Error ? error.message : "Unknown error",
     });
 
-    return NextResponse.redirect(
-      new URL(
-        `/oauth/callback?error=login_failed&error_description=${encodeURIComponent(
-          "Unable to start OAuth login."
-        )}`,
-        req.url
-      )
+    return redirectWithLoginError(
+      req,
+      "login_failed",
+      "Unable to start OAuth login."
     );
   }
 }
@@ -106,4 +122,48 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+
+async function canReachOAuthProvider(authorizationUrl: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OAUTH_START_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(authorizationUrl, {
+      method: "GET",
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal,
+    });
+
+    return res.status < 500;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function redirectWithLoginError(
+  req: Request,
+  error: string,
+  description: string
+): NextResponse {
+  const url = new URL("/oauth/callback", getRequestOrigin(req));
+  url.searchParams.set("error", error);
+  url.searchParams.set("error_description", description);
+
+  return NextResponse.redirect(url);
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }

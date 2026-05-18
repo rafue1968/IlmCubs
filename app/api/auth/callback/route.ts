@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getEnv } from "@/app/lib/env";
 import {
+  APP_USER_SESSION_COOKIE,
   createQuranOAuthProfileCookieValue,
+  getOAuthIdentityFromIdToken,
   QURAN_ACCESS_TOKEN_COOKIE,
   QURAN_OAUTH_PROFILE_COOKIE,
   QURAN_REFRESH_TOKEN_COOKIE,
@@ -267,8 +269,19 @@ async function completeOAuthCallback(
     const expiresIn = data.expires_in;
     const tokenMaxAge = readExpiresInSeconds(expiresIn);
     const profileCookieValue = createQuranOAuthProfileCookieValue(data.id_token);
+    const oauthUserId = getOAuthIdentityFromIdToken(
+      typeof data.id_token === "string" ? data.id_token : String(data.id_token ?? "")
+    );
     
-
+    if (!oauthUserId){
+      return oauthFailureResponse(
+        req,
+        options.mode,
+        400,
+        "Missing OAuth identity (sub)",
+        "missing_oauth_identity",
+      );
+    }
 
     if (typeof accessToken !== "string" || !accessToken) {
       return oauthFailureResponse(
@@ -283,11 +296,32 @@ async function completeOAuthCallback(
       );
     }
 
+    const user = await prisma.user.upsert({
+      where: {
+        oauthUserId,
+      },
+      update: {
+        email: undefined,
+      },
+      create: {
+        oauthUserId,
+        email: null,
+        role: "PARENT",
+      },
+    })
+
     const res =
       options.mode === "redirect"
         ? NextResponse.redirect(new URL("/", getRequestOrigin(req)))
         : NextResponse.json({ success: true });
     clearOAuthCookies(res);
+
+    res.cookies.set(APP_USER_SESSION_COOKIE, user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
 
     res.cookies.set(QURAN_ACCESS_TOKEN_COOKIE, accessToken, {
       httpOnly: true,

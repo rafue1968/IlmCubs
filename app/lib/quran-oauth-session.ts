@@ -73,6 +73,22 @@ export function createQuranOAuthProfileCookieValue(
   });
 }
 
+
+export function getOAuthIdentityFromIdToken(idToken: string): string | null {
+  if (!idToken) {
+    return null;
+  }
+
+  const payload = decodeJwtPayload(idToken);
+
+  if (!payload) {
+    return null;
+  }
+
+  return getString(payload.sub) ?? null;
+}
+
+
 function decodeJwtPayload(idToken: string): JwtPayload | null {
   const [, payload] = idToken.split(".");
 

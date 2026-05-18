@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  PARENT
-  CHILD
-}
-
 //
 // 👤 INTERNAL USER (mapped from OAuth)
 //
@@ -21,7 +16,7 @@ model User {
   email         String?
   role          UserRole @default(PARENT)
 
-  parentProfile ParentProfile?
+  children      Child[]
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -33,28 +28,15 @@ enum UserRole {
 }
 
 //
-// 👨‍👩‍👧 PARENT PROFILE
-// (separates auth identity from app logic)
-//
-model ParentProfile {
-  id        String  @id @default(uuid())
-  userId    String  @unique
-  user      User    @relation(fields: [userId], references: [id])
-
-  children  Child[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-//
 // 🧒 CHILD PROFILE
 //
 model Child {
   id        String @id @default(uuid())
 
-  parentId  String
-  parent    ParentProfile @relation(fields: [parentId], references: [id])
+  userId  String
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 
   name      String
   age       Int?
@@ -73,7 +55,9 @@ model Streak {
   id        String @id @default(uuid())
 
   childId   String @unique
-  child     Child  @relation(fields: [childId], references: [id])
+  child     Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
 
   current   Int @default(0)
   longest   Int @default(0)
@@ -87,10 +71,13 @@ model Bookmark {
   id        String @id @default(uuid())
 
   childId   String
-  child     Child @relation(fields: [childId], references: [id])
+  child     Child @relation(fields: [childId], references: [id], onDelete: Cascade)
 
   surah     Int
   ayah      Int
+
+  @@unique([childId, surah, ayah])
+  @@index([childId])
 
   note      String?
   createdAt DateTime @default(now())

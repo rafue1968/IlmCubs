@@ -16,6 +16,7 @@ import {
   redactUrlForLogs,
   redactValue,
 } from "@/app/lib/oauth-server";
+import { prisma } from "../../../lib/prisma";
 
 type CallbackRequest = {
   code?: string | null;
@@ -266,6 +267,8 @@ async function completeOAuthCallback(
     const expiresIn = data.expires_in;
     const tokenMaxAge = readExpiresInSeconds(expiresIn);
     const profileCookieValue = createQuranOAuthProfileCookieValue(data.id_token);
+    
+
 
     if (typeof accessToken !== "string" || !accessToken) {
       return oauthFailureResponse(

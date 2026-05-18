@@ -1,14 +1,17 @@
-import { headers } from "next/headers";
+// app/lib/auth/getCurrentUser.ts
+import { cookies } from "next/headers";
+import { prisma } from "@/app/lib/prisma";
+import { APP_USER_SESSION_COOKIE } from "@/app/lib/quran-oauth-session";
 
-// IMPORTANT:
-// Replace this with actual hackathon OAuth SDK when available
-// For now we assume OAuth gives us a user id via headers or session token
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const userId = cookieStore.get(APP_USER_SESSION_COOKIE)?.value;
 
-export async function getOAuthUserId(): Promise<string | null> {
-  const headersList = await headers();
+  if (!userId) return null;
 
-  // Example: depending on hackathon OAuth implementation
-  const userId = headersList.get("x-oauth-user-id");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
 
-  return userId;
+  return user;
 }

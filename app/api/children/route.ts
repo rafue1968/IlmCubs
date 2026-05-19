@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/auth/requireUser";
+import { connect } from "http2";
 
 export async function GET() {
   try {
@@ -49,11 +50,14 @@ export async function POST(req: Request) {
 
     const child = await prisma.child.create({
       data: {
-        userId: user.id,
         name,
         age: age ?? null,
 
-        // NO streak created here → lazy creation later
+        user: {
+          connect: {
+            id: user.id,
+          },
+        },
       },
     });
 

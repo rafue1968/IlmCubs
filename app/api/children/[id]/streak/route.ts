@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "@/app/lib/auth/requireUser";
+import { handleAuthError } from "@/app/lib/auth/handleAuthError";
 
 export async function POST(req: Request) {
   try {
     const user = await requireUser();
+
     const body = await req.json();
 
     const { childId, increment } = body;
@@ -16,7 +18,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔐 Ensure child belongs to user
     const child = await prisma.child.findFirst({
       where: {
         id: childId,
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
 
     const streak = await prisma.streak.upsert({
       where: {
-        childId: childId,
+        childId,
       },
       create: {
         childId,
@@ -45,17 +46,16 @@ export async function POST(req: Request) {
         longest: shouldIncrement ? 1 : 0,
         lastRead: shouldIncrement ? now : null,
       },
-      update: {
-        ...(shouldIncrement && {
-          current: {
-            increment: 1,
-          },
-          lastRead: now,
-        }),
-      },
+      update: shouldIncrement
+        ? {
+            current: {
+              increment: 1,
+            },
+            lastRead: now,
+          }
+        : {},
     });
 
-    // 🔥 Fix longest streak (only after update)
     const updatedStreak =
       streak.current > streak.longest
         ? await prisma.streak.update({
@@ -69,14 +69,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       streak: updatedStreak,
     });
-  } catch (e) {
-    if (e instanceof Error && e.message === "UNAUTHORIZED") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    return NextResponse.json(
-      { error: "Failed to update streak" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleAuthError(error);
   }
 }

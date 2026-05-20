@@ -35,6 +35,8 @@ interface StoryConfig {
 const STORIES: StoryConfig[] = [
   { surah: "Al-Fil", topic: "Elephant and the Kaaba", name: "The Elephant", juz: 30 },
   { surah: "Quraysh", topic: "Trade and protection", name: "Quraysh Tribe", juz: 30 },
+  { surah: "Al-Ikhlas", topic: "Allah is One", name: "One Allah", juz: 30 },
+  { surah: "An-Nas", topic: "Asking Allah for protection", name: "Safe Hearts", juz: 30 },
 ];
 
 type StoryCard = {
@@ -46,7 +48,13 @@ type StoryCard = {
 };
 
 type Difficulty = "easy" | "guided" | "challenge";
-type QuestionStyle = "meaning" | "kindness" | "daily-action";
+type QuestionStyle =
+  | "meaning"
+  | "kindness"
+  | "daily-action"
+  | "listen"
+  | "sequence"
+  | "feeling";
 
 export default function StoryTime() {
   const [selectedStory, setSelectedStory] = useState<StoryConfig | null>(null);
@@ -534,6 +542,9 @@ export default function StoryTime() {
             { id: "meaning", label: "Meaning" },
             { id: "kindness", label: "Kindness" },
             { id: "daily-action", label: "Daily action" },
+            { id: "listen", label: "Listen" },
+            { id: "sequence", label: "What happened" },
+            { id: "feeling", label: "Feelings" },
           ].map((style) => (
             <button
               key={style.id}

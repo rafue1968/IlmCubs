@@ -31,9 +31,14 @@ function buildFallbackQuestions(
   topic: string,
   difficulty: string
 ): QuizQuestion[] {
+  const challengeQuestion =
+    difficulty === "challenge"
+      ? `How can you use the lesson from ${surah} today?`
+      : `What does ${surah} teach us?`;
+
   return [
     {
-      question: `What does ${surah} teach us?`,
+      question: challengeQuestion,
       options: [
         "Trust Allah and do good",
         "Be mean to others",
@@ -58,6 +63,28 @@ function buildFallbackQuestions(
       explanation: `This story teaches children to choose kind and helpful actions.`,
     },
     {
+      question: `What happened in this lesson first?`,
+      options: [
+        "We listen and learn",
+        "We shout over everyone",
+        "We stop trying",
+        "We forget the lesson",
+      ],
+      correctAnswer: 0,
+      explanation: `First we listen with calm hearts, then we try the good lesson.`,
+    },
+    {
+      question: `How can a child feel after doing a good action?`,
+      options: [
+        "Happy and thankful",
+        "Mean and proud",
+        "Angry at everyone",
+        "Too busy to care",
+      ],
+      correctAnswer: 0,
+      explanation: `Good actions can help our hearts feel thankful and peaceful.`,
+    },
+    {
       question: `What should a child do after learning this Quran story?`,
       options: [
         "Practice a good action",
@@ -67,28 +94,6 @@ function buildFallbackQuestions(
       ],
       correctAnswer: 0,
       explanation: `The Quran teaches us to learn and practice good manners.`,
-    },
-    {
-      question: `Which choice is best?`,
-      options: [
-        "Be patient and kind",
-        "Be angry and selfish",
-        "Push others away",
-        "Break promises",
-      ],
-      correctAnswer: 0,
-      explanation: `Patience and kindness are beautiful qualities in Quran stories.`,
-    },
-    {
-      question: `What does Allah love?`,
-      options: [
-        "Good choices",
-        "Bad behavior",
-        "Cruel actions",
-        "Selfishness",
-      ],
-      correctAnswer: 0,
-      explanation: `Allah loves good choices, kindness, and honesty.`,
     },
   ];
 }
@@ -112,7 +117,14 @@ Rules:
 - Use short sentences.
 - Make questions friendly and easy for little children.
 - Difficulty level: ${difficulty}. For "easy", ask recall questions. For "guided", ask meaning/action questions. For "challenge", ask gentle real-life application questions.
-- Question style: ${questionStyle}. Keep every question age-appropriate and cheerful.
+- Question style: ${questionStyle}.
+  - meaning: ask what the story teaches.
+  - kindness: ask which kind choice fits.
+  - daily-action: ask what the child can do today.
+  - listen: write questions that are especially easy to answer after hearing them aloud.
+  - sequence: ask what happened first/next/last in a very simple way.
+  - feeling: ask about gentle feelings like gratitude, calm, patience, and kindness.
+- Keep every question age-appropriate and cheerful.
 - Focus on meanings, kindness, gratitude, patience, trust in Allah, and everyday good actions.
 - Avoid complex law, conflict, punishment details, adult themes, fear-based wording, or graphic content.
 - Avoid repeating any of these previous questions:

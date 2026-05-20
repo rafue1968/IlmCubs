@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BookmarkCheck, Sparkles, Volume2 } from "lucide-react";
+import { BookmarkCheck, BookOpen, HeartHandshake, Puzzle, Sparkles, Volume2 } from "lucide-react";
 import {
   addBookmark,
   addQuizHistory,
@@ -38,6 +38,14 @@ type QuizState = {
   score: number;
   selectedChoiceId: number | null;
 };
+
+type ChallengeOption = {
+  id: number;
+  label: string;
+  subLabel?: string;
+};
+
+type ChallengeKind = "surah" | "meaning" | "good-deed";
 
 function createQuizState(): QuizState {
   return {
@@ -127,6 +135,12 @@ export default function MatchTheSurahPage() {
       : quizState.currentIndex < 4
         ? "Guided matching"
         : "Challenge round";
+  const challengeKind = getChallengeKind(quizState.currentIndex);
+  const challengeMeta = getChallengeMeta(challengeKind);
+  const ChallengeIcon = challengeMeta.Icon;
+  const challengeOptions = currentQuestion
+    ? getChallengeOptions(challengeKind, currentQuestion, questions)
+    : [];
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -205,6 +219,108 @@ export default function MatchTheSurahPage() {
     utterance.rate = 0.82;
     utterance.pitch = 1.08;
     window.speechSynthesis.speak(utterance);
+  }
+
+  function getChallengeKind(index: number): ChallengeKind {
+    const kinds: ChallengeKind[] = ["surah", "meaning", "good-deed"];
+    return kinds[index % kinds.length];
+  }
+
+  function getChallengeMeta(kind: ChallengeKind) {
+    if (kind === "meaning") {
+      return {
+        label: "Meaning match",
+        prompt: "Which meaning belongs with this verse?",
+        Icon: BookOpen,
+      };
+    }
+
+    if (kind === "good-deed") {
+      return {
+        label: "Good deed choice",
+        prompt: "Which action can we try today?",
+        Icon: HeartHandshake,
+      };
+    }
+
+    return {
+      label: "Surah match",
+      prompt: currentQuestion?.prompt || "Which surah is this verse from?",
+      Icon: Puzzle,
+    };
+  }
+
+  function getChallengeOptions(
+    kind: ChallengeKind,
+    question: GeminiMatchSurahQuestion,
+    allQuestions: GeminiMatchSurahQuestion[]
+  ): ChallengeOption[] {
+    if (kind === "meaning") {
+      const distractors = allQuestions
+        .filter((candidate) => candidate.verseKey !== question.verseKey)
+        .slice(0, 3)
+        .map((candidate, index) => ({
+          id: -100 - index,
+          label: candidate.translationText,
+        }));
+
+      return shuffleOptions(
+        [
+        {
+          id: question.correctChapterId,
+          label: question.translationText,
+        },
+        ...distractors,
+        ],
+        `${question.verseKey}-${kind}`
+      );
+    }
+
+    if (kind === "good-deed") {
+      return shuffleOptions(
+        [
+        {
+          id: question.correctChapterId,
+          label: question.goodDeed || "Be kind today.",
+        },
+        {
+          id: -201,
+          label: "Ignore someone who needs help.",
+        },
+        {
+          id: -202,
+          label: "Use rude words when upset.",
+        },
+        {
+          id: -203,
+          label: "Keep all good things only for myself.",
+        },
+        ],
+        `${question.verseKey}-${kind}`
+      );
+    }
+
+    return question.choices.map((choice) => ({
+      id: choice.id,
+      label: choice.latinName,
+      subLabel: choice.arabicName,
+    }));
+  }
+
+  function shuffleOptions(options: ChallengeOption[], seed: string) {
+    return options
+      .map((option, index) => ({
+        option,
+        sort: hashString(`${seed}-${option.id}-${index}`),
+      }))
+      .sort((a, b) => a.sort - b.sort)
+      .map(({ option }) => option);
+  }
+
+  function hashString(value: string) {
+    return value.split("").reduce((hash, char) => {
+      return (hash * 31 + char.charCodeAt(0)) % 997;
+    }, 7);
   }
 
   return (
@@ -417,11 +533,12 @@ export default function MatchTheSurahPage() {
 
               <div className="mt-5 rounded-[26px] border-[3px] border-white/70 bg-white/40 p-4">
                 <div className="text-center">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">
-                    {moduleName}
+                  <p className="inline-flex items-center justify-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-600">
+                    <ChallengeIcon className="h-4 w-4" aria-hidden="true" />
+                    {moduleName} · {challengeMeta.label}
                   </p>
                   <p className="mt-1 text-xl font-extrabold text-slate-900">
-                    🎯 {currentQuestion.prompt}
+                    🎯 {challengeMeta.prompt}
                   </p>
                 </div>
 
@@ -432,9 +549,9 @@ export default function MatchTheSurahPage() {
                 ) : null}
 
                 <div className="mt-4 grid grid-cols-2 gap-4">
-                  {currentQuestion.choices.map((choice) => {
-                    const isCorrect = choice.id === currentQuestion.correctChapterId;
-                    const isSelected = choice.id === quizState.selectedChoiceId;
+                  {challengeOptions.map((option) => {
+                    const isCorrect = option.id === currentQuestion.correctChapterId;
+                    const isSelected = option.id === quizState.selectedChoiceId;
 
                     let buttonClasses =
                       "rounded-[22px] border-4 p-4 text-left shadow-[0_18px_40px_-30px_rgba(2,6,23,0.6)] transition active:scale-[0.99] ";
@@ -453,18 +570,20 @@ export default function MatchTheSurahPage() {
 
                     return (
                       <button
-                        key={choice.id}
+                        key={`${challengeKind}-${option.id}`}
                         type="button"
-                        onClick={() => handleChoice(choice.id)}
+                        onClick={() => handleChoice(option.id)}
                         disabled={quizState.selectedChoiceId !== null}
                         className={buttonClasses}
                       >
-                        <p className="text-center text-lg font-extrabold text-slate-900">
-                          {choice.latinName}
+                        <p className="text-center text-base font-extrabold leading-6 text-slate-900 sm:text-lg">
+                          {option.label}
                         </p>
-                        <p className="mt-1 text-center text-sm font-bold text-purple-700">
-                          {choice.arabicName}
-                        </p>
+                        {option.subLabel ? (
+                          <p className="mt-1 text-center text-sm font-bold text-purple-700">
+                            {option.subLabel}
+                          </p>
+                        ) : null}
                       </button>
                     );
                   })}

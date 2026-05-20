@@ -56,6 +56,16 @@ type GeminiEnhancement = {
   goodDeed: string;
 };
 
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
 const ALLOWED_CHAPTER_IDS = [105, 106, 107, 108, 109, 110, 111, 112, 113, 114];
 const TOTAL_QUESTIONS = 5;
 const OPTION_COUNT = 4;
@@ -219,8 +229,8 @@ ${JSON.stringify(source, null, 2)}
       return null;
     }
 
-    const raw =
-      (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const envelope = data as GeminiGenerateContentResponse;
+    const raw = envelope.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
     if (!raw) {
       return null;

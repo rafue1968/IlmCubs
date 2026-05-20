@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 export const QURAN_ACCESS_TOKEN_COOKIE = "quran_access_token";
 export const QURAN_REFRESH_TOKEN_COOKIE = "quran_refresh_token";
 export const QURAN_OAUTH_PROFILE_COOKIE = "quran_oauth_profile";
+export const APP_USER_SESSION_COOKIE = "ilmcubs_user_id";
 
 export type QuranOAuthProfile = {
   displayName: string;
   initials: string;
+  oAuthUserId?: string;
 };
 
 type StoredQuranOAuthProfile = QuranOAuthProfile & {
@@ -67,8 +69,25 @@ export function createQuranOAuthProfileCookieValue(
     displayName,
     initials: getInitials(displayName),
     subject: getString(payload.sub) ?? undefined,
+    oAuthUserId: getString(payload.sub) ?? undefined,
   });
 }
+
+
+export function getOAuthIdentityFromIdToken(idToken: string): string | null {
+  if (!idToken) {
+    return null;
+  }
+
+  const payload = decodeJwtPayload(idToken);
+
+  if (!payload) {
+    return null;
+  }
+
+  return getString(payload.sub) ?? null;
+}
+
 
 function decodeJwtPayload(idToken: string): JwtPayload | null {
   const [, payload] = idToken.split(".");
@@ -158,6 +177,7 @@ function decodeProfileCookie(
         typeof profile.initials === "string" && profile.initials.trim()
           ? profile.initials.trim().slice(0, 2).toUpperCase()
           : getInitials(profile.displayName),
+      oAuthUserId: profile.oAuthUserId,
     };
   } catch {
     return null;

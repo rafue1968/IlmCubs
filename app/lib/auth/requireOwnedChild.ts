@@ -1,6 +1,6 @@
 import { prisma } from "@/app/lib/prisma";
 import { requireUser } from "./requireUser";
-import { NotFoundError } from "./error";
+import { NotFoundError } from "./auth-errors";
 
 export async function requireOwnedChild(childId: string) {
   const user = await requireUser();

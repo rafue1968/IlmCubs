@@ -4,14 +4,15 @@ import { requireUser } from "@/app/lib/auth/requireUser";
 
 export async function DELETE(
   _req: Request,
-  { params }: { params: { childId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await requireUser();
+    const resolvedParams = await params;
 
     const child = await prisma.child.findFirst({
       where: {
-        id: params.childId,
+        id: resolvedParams.id,
         userId: user.id, // 🔐 critical ownership check
       },
     });

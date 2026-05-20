@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { prisma } from "@/app/lib/prisma";
 import { APP_USER_SESSION_COOKIE } from "@/app/lib/quran-oauth-session";
-import { UnauthorizedError } from "./error";
+import { UnauthorizedError } from "./auth-errors";
 
 export async function requireUser() {
   const cookieStore = await cookies();

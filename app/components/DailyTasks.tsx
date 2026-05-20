@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, CheckCircle2, HeartHandshake, Volume2 } from "lucide-react";
+import { BookOpen, CheckCircle2, Flame, HeartHandshake, Sparkles, Volume2 } from "lucide-react";
 import { incrementStreak } from "@/lib/progress-storage";
 
 const TASK_STORAGE_KEY = "ilmcubs_daily_tasks";
@@ -76,6 +76,7 @@ function saveCompletedTasks(completed: string[]) {
 
 export default function DailyTasks() {
   const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
+  const [justCompletedTaskId, setJustCompletedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -90,7 +91,12 @@ export default function DailyTasks() {
     saveCompletedTasks(nextCompletedTaskIds);
     incrementStreak();
     setCompletedTaskIds(nextCompletedTaskIds);
+    setJustCompletedTaskId(taskId);
+    window.setTimeout(() => setJustCompletedTaskId(null), 1600);
   }
+
+  const completedCount = completedTaskIds.length;
+  const progressPercent = Math.round((completedCount / dailyTasks.length) * 100);
 
   return (
     <section className="mt-8 rounded-[36px] border-4 border-white/60 bg-white/35 p-6 shadow-[0_30px_70px_-45px_rgba(2,6,23,0.55)] backdrop-blur sm:p-8">
@@ -100,6 +106,23 @@ export default function DailyTasks() {
       <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-950">
         Today&apos;s Quran tasks
       </h2>
+      <div className="mt-5 rounded-[24px] border-4 border-white/60 bg-white/50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="flex items-center gap-2 text-sm font-black uppercase tracking-[0.18em] text-slate-700">
+            <Flame className="h-4 w-4 text-orange-500" aria-hidden="true" />
+            Daily light
+          </p>
+          <p className="text-sm font-extrabold text-slate-800">
+            {completedCount}/{dailyTasks.length} complete
+          </p>
+        </div>
+        <div className="mt-3 h-4 overflow-hidden rounded-full bg-white ring-2 ring-white/70">
+          <div
+            className="ilm-shine h-full rounded-full bg-gradient-to-r from-emerald-400 via-yellow-300 to-orange-400 transition-all duration-500"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {dailyTasks.map((task) => {
@@ -109,10 +132,19 @@ export default function DailyTasks() {
           return (
             <div
               key={task.id}
-              className="rounded-[28px] border-4 border-white/60 bg-white/45 p-5"
+              className={[
+                "relative rounded-[28px] border-4 border-white/60 bg-white/45 p-5 transition",
+                isComplete ? "bg-emerald-50/70" : "hover:-translate-y-1 hover:bg-white/55",
+                justCompletedTaskId === task.id ? "ilm-pop" : "",
+              ].join(" ")}
             >
+              {justCompletedTaskId === task.id ? (
+                <div className="pointer-events-none absolute -right-3 -top-3 rounded-full bg-yellow-300 px-3 py-2 text-xs font-black text-slate-900 shadow-lg">
+                  + light
+                </div>
+              ) : null}
               <div className="flex items-start justify-between gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 ring-2 ring-white/80">
+                <span className="ilm-float flex h-11 w-11 items-center justify-center rounded-2xl bg-white/70 text-emerald-700 ring-2 ring-white/80">
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
                 {isComplete ? (
@@ -135,8 +167,9 @@ export default function DailyTasks() {
                 type="button"
                 onClick={() => handleComplete(task.id)}
                 disabled={isComplete}
-                className="mt-4 w-full rounded-full bg-slate-900 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:bg-slate-400"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:bg-emerald-500"
               >
+                {isComplete ? <Sparkles className="h-4 w-4" aria-hidden="true" /> : null}
                 {isComplete ? "Completed today" : "Mark complete"}
               </button>
             </div>

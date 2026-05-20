@@ -46,6 +46,7 @@ export default function ParentProgressPanel() {
   );
   const averageScore = getAverageScore(quizScores);
   const latestBookmarks = progress.bookmarks.slice().reverse().slice(0, 6);
+  const streakMilestones = [1, 3, 7, 14, 30];
 
   function handleRemoveBookmark(bookmark: BookmarkItem) {
     removeBookmark(bookmark.id);
@@ -67,8 +68,10 @@ export default function ParentProgressPanel() {
         </p>
 
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-[24px] border-4 border-white/60 bg-white/50 p-5">
-            <Flame className="h-6 w-6 text-orange-500" aria-hidden="true" />
+          <div className="ilm-pop rounded-[24px] border-4 border-white/60 bg-white/50 p-5">
+            <span className="ilm-pulse-ring flex h-11 w-11 items-center justify-center rounded-full bg-orange-100">
+              <Flame className="h-6 w-6 text-orange-500" aria-hidden="true" />
+            </span>
             <p className="mt-4 text-sm font-black uppercase tracking-[0.18em] text-slate-600">
               Current streak
             </p>
@@ -104,6 +107,38 @@ export default function ParentProgressPanel() {
             </p>
           </div>
         </div>
+
+        <div className="mt-6 rounded-[26px] border-4 border-white/60 bg-white/50 p-5">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-600">
+            Streak path
+          </p>
+          <div className="mt-4 grid grid-cols-5 gap-2">
+            {streakMilestones.map((milestone) => {
+              const isUnlocked = progress.streak >= milestone;
+
+              return (
+                <div
+                  key={milestone}
+                  className={[
+                    "rounded-2xl p-3 text-center ring-2 transition",
+                    isUnlocked
+                      ? "ilm-pop bg-yellow-100 text-yellow-950 ring-yellow-200"
+                      : "bg-white/70 text-slate-500 ring-white/70",
+                  ].join(" ")}
+                >
+                  <Sparkles
+                    className={[
+                      "mx-auto h-5 w-5",
+                      isUnlocked ? "text-yellow-500" : "text-slate-300",
+                    ].join(" ")}
+                    aria-hidden="true"
+                  />
+                  <p className="mt-1 text-xs font-black">{milestone}d</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -116,7 +151,7 @@ export default function ParentProgressPanel() {
               latestBookmarks.map((bookmark) => (
                 <div
                   key={bookmark.id}
-                  className="flex items-start justify-between gap-4 rounded-[22px] bg-white/60 p-4 ring-2 ring-white/70"
+                  className="ilm-pop flex items-start justify-between gap-4 rounded-[22px] bg-white/60 p-4 ring-2 ring-white/70"
                 >
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Volume2 } from "lucide-react";
+import { BookmarkCheck, Sparkles, Volume2 } from "lucide-react";
 import {
   addBookmark,
   addQuizHistory,
@@ -55,6 +55,7 @@ export default function MatchTheSurahPage() {
   const [isCurrentQuestionBookmarked, setIsCurrentQuestionBookmarked] =
     useState(false);
   const [hasStartedQuiz, setHasStartedQuiz] = useState(false);
+  const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
 
   async function loadQuiz() {
     setIsLoading(true);
@@ -178,6 +179,8 @@ export default function MatchTheSurahPage() {
     if (isCurrentQuestionBookmarked) {
       removeBookmark(currentQuestion.verseKey);
       setIsCurrentQuestionBookmarked(false);
+      setBookmarkMessage("Removed from your saved gems");
+      window.setTimeout(() => setBookmarkMessage(null), 1400);
       return;
     }
 
@@ -188,6 +191,8 @@ export default function MatchTheSurahPage() {
       timestamp: Date.now(),
     });
     setIsCurrentQuestionBookmarked(true);
+    setBookmarkMessage("Saved as a learning gem");
+    window.setTimeout(() => setBookmarkMessage(null), 1400);
   }
 
   function handleSpeak(text: string) {
@@ -204,6 +209,12 @@ export default function MatchTheSurahPage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-sky-200 via-emerald-100 to-yellow-100 px-5 py-10">
+      {bookmarkMessage ? (
+        <div className="ilm-pop fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg">
+          <Sparkles className="h-4 w-4 text-yellow-300" aria-hidden="true" />
+          {bookmarkMessage}
+        </div>
+      ) : null}
       <div className="mx-auto w-full max-w-xl">
         <div className="mb-4 flex items-center justify-between gap-3">
           <Link
@@ -366,9 +377,15 @@ export default function MatchTheSurahPage() {
                     <button
                       type="button"
                       onClick={handleToggleBookmark}
-                      className="rounded-full bg-white/80 px-3 py-1 text-xs font-extrabold text-emerald-900 ring-1 ring-emerald-200 transition hover:bg-white"
+                      className={[
+                        "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-extrabold ring-1 transition",
+                        isCurrentQuestionBookmarked
+                          ? "ilm-pop bg-yellow-200 text-yellow-950 ring-yellow-300"
+                          : "bg-white/80 text-emerald-900 ring-emerald-200 hover:bg-white",
+                      ].join(" ")}
                     >
-                      {isCurrentQuestionBookmarked ? "Saved" : "Save"}
+                      <BookmarkCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                      {isCurrentQuestionBookmarked ? "Gem saved" : "Save gem"}
                     </button>
                   </div>
                 </div>

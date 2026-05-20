@@ -66,6 +66,7 @@ export default function StoryTime() {
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [questionStyle, setQuestionStyle] = useState<QuestionStyle>("meaning");
   const [celebrationText, setCelebrationText] = useState<string | null>(null);
+  const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
 
 
   const generateQuestions = useCallback(async () => {
@@ -180,6 +181,8 @@ export default function StoryTime() {
       setBookmarkedStoryIds((currentIds) =>
         currentIds.filter((currentId) => currentId !== storyId)
       );
+      setBookmarkMessage("Removed from saved stories");
+      window.setTimeout(() => setBookmarkMessage(null), 1400);
       return;
     }
 
@@ -190,6 +193,8 @@ export default function StoryTime() {
       timestamp: Date.now(),
     });
     setBookmarkedStoryIds((currentIds) => [...currentIds, storyId]);
+    setBookmarkMessage("Story saved to your collection");
+    window.setTimeout(() => setBookmarkMessage(null), 1400);
   };
 
   const handleAnswer = (index: number) => {
@@ -280,6 +285,12 @@ export default function StoryTime() {
   if (!selectedStory) {
     return (
       <div className="space-y-6">
+        {bookmarkMessage ? (
+          <div className="ilm-pop fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg">
+            <Sparkles className="h-4 w-4 text-yellow-300" aria-hidden="true" />
+            {bookmarkMessage}
+          </div>
+        ) : null}
         <div className="text-center">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Quran Story Time
@@ -364,6 +375,12 @@ export default function StoryTime() {
 
     return (
       <div className="space-y-6">
+        {bookmarkMessage ? (
+          <div className="ilm-pop fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg">
+            <Sparkles className="h-4 w-4 text-yellow-300" aria-hidden="true" />
+            {bookmarkMessage}
+          </div>
+        ) : null}
         {celebrationText ? (
           <div className="fixed left-1/2 top-8 z-50 -translate-x-1/2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg">
             {celebrationText}
@@ -453,6 +470,12 @@ export default function StoryTime() {
 
   return (
     <div className="space-y-6">
+      {bookmarkMessage ? (
+        <div className="ilm-pop fixed left-1/2 top-6 z-50 flex -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg">
+          <Sparkles className="h-4 w-4 text-yellow-300" aria-hidden="true" />
+          {bookmarkMessage}
+        </div>
+      ) : null}
       {celebrationText ? (
         <div className="fixed left-1/2 top-8 z-50 -translate-x-1/2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg">
           {celebrationText}
@@ -471,10 +494,15 @@ export default function StoryTime() {
         <div className="flex flex-wrap justify-end gap-2">
           <button
             onClick={() => toggleStoryBookmark(selectedStory)}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-blue-700 rounded-lg hover:bg-blue-100 transition"
+            className={[
+              "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition",
+              isStoryBookmarked(selectedStory)
+                ? "ilm-pop bg-yellow-200 text-yellow-950"
+                : "bg-white text-blue-700 hover:bg-blue-100",
+            ].join(" ")}
           >
             <Bookmark className="h-4 w-4" aria-hidden="true" />
-            {isStoryBookmarked(selectedStory) ? "Saved" : "Save"}
+            {isStoryBookmarked(selectedStory) ? "Story saved" : "Save story"}
           </button>
           <button
             onClick={handleReset}

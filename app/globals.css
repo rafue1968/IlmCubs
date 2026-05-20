@@ -29,3 +29,79 @@ body {
   color: white;
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@keyframes ilm-pop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  65% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ilm-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes ilm-shine {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes ilm-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(251, 146, 60, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0);
+  }
+}
+
+.ilm-pop {
+  animation: ilm-pop 420ms ease-out both;
+}
+
+.ilm-float {
+  animation: ilm-float 2.6s ease-in-out infinite;
+}
+
+.ilm-shine {
+  overflow: hidden;
+  position: relative;
+}
+
+.ilm-shine::after {
+  animation: ilm-shine 2.8s ease-in-out infinite;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.55),
+    transparent
+  );
+  content: "";
+  inset: 0;
+  position: absolute;
+}
+
+.ilm-pulse-ring {
+  animation: ilm-pulse-ring 1.8s ease-out infinite;
+}

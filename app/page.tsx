@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import DailyTasks from "./components/DailyTasks";
 import LoginButton from "./components/LoginButton";
 import StreakBadge from "./components/StreakBadge";
 import {
@@ -189,6 +190,13 @@ export default function HomePage() {
                   Open StoryTime
                 </Link>
 
+                <Link
+                  href="/parent"
+                  className="rounded-full bg-white/70 px-6 py-3 text-sm font-extrabold text-slate-900 ring-2 ring-white/70 transition hover:bg-white"
+                >
+                  Parent Progress
+                </Link>
+
                 <Suspense fallback={<HomeQuranStatusFallback />}>
                   <HomeQuranAuthStatus />
                 </Suspense>
@@ -258,12 +266,14 @@ export default function HomePage() {
 
             <ActivityCard
               title="More Games"
-              subtitle="New activities, rewards, and learning paths are coming soon."
+              subtitle="More guided modules, audio, and learning paths are coming soon."
               emoji="🎈"
               disabled
             />
           </div>
         </section>
+
+        <DailyTasks />
 
         <section className="mt-8 rounded-[36px] border-4 border-white/60 bg-white/35 p-6 shadow-[0_30px_70px_-45px_rgba(2,6,23,0.55)] backdrop-blur sm:p-8">
           <p className="text-sm font-black uppercase tracking-[0.24em] text-slate-700">

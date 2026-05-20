@@ -156,3 +156,11 @@ export function addQuizHistory(score: number) {
     ],
   });
 }
+
+export function getQuizHistory() {
+  return readStore().quizHistory;
+}
+
+export function getProgressStore() {
+  return readStore();
+}

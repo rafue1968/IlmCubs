@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/app/lib/auth/requireUser";
 import { requireOwnedChild } from "@/app/lib/auth/requireOwnedChild";
-import { incrementStreak, getStreakStats, resetStreak } from "@/app/lib/streak-service";
+import {
+  upsertBookmark,
+  getBookmarksForChild,
+} from "@/app/lib/bookmarks-service";
+import { validateVerseInput } from "@/app/lib/quran-validation";
 
 export const runtime = "nodejs";
 
@@ -10,8 +14,8 @@ interface RouteParams {
 }
 
 /**
- * GET /api/children/[id]/streak
- * Get streak statistics for a child
+ * GET /api/children/[id]/bookmarks
+ * List all bookmarks for a child
  */
 export async function GET(req: Request, context: RouteParams) {
   try {
@@ -21,11 +25,16 @@ export async function GET(req: Request, context: RouteParams) {
     // Verify ownership
     await requireOwnedChild(childId);
 
-    const stats = await getStreakStats(childId);
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(Number(searchParams.get("limit")) || 50, 100);
+    const offset = Number(searchParams.get("offset")) || 0;
+
+    const bookmarks = await getBookmarksForChild(childId, limit, offset);
 
     return NextResponse.json({
       success: true,
-      streak: stats,
+      bookmarks,
+      count: bookmarks.length,
     });
   } catch (err) {
     if (err instanceof Error) {
@@ -37,7 +46,7 @@ export async function GET(req: Request, context: RouteParams) {
       }
     }
 
-    console.error("[streak] GET error:", err);
+    console.error("[bookmarks] GET error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -46,8 +55,8 @@ export async function GET(req: Request, context: RouteParams) {
 }
 
 /**
- * POST /api/children/[id]/streak
- * Increment streak for a child (with daily limit)
+ * POST /api/children/[id]/bookmarks
+ * Create or update a bookmark
  */
 export async function POST(req: Request, context: RouteParams) {
   try {
@@ -57,25 +66,32 @@ export async function POST(req: Request, context: RouteParams) {
     // Verify ownership
     await requireOwnedChild(childId);
 
-    const body = (await req.json()) as { action?: string };
-    const { action } = body;
+    const body = (await req.json()) as {
+      surah?: unknown;
+      ayah?: unknown;
+      note?: string | null;
+    };
 
-    if (action === "reset") {
-      const streak = await resetStreak(childId);
-      return NextResponse.json({
-        success: true,
-        streak,
-        message: "Streak reset",
-      });
+    const { surah, ayah, note } = body;
+
+    // Validate Quran verse
+    const validation = validateVerseInput(surah, ayah);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: "Invalid verse", details: validation.errors },
+        { status: 400 }
+      );
     }
 
-    // Default: increment
-    const result = await incrementStreak(childId);
+    const bookmark = await upsertBookmark(childId, {
+      surah: Number(surah),
+      ayah: Number(ayah),
+      note: note?.trim() || null,
+    });
 
     return NextResponse.json({
-      success: result.incremented,
-      streak: result.streak,
-      message: result.reason,
+      success: true,
+      bookmark,
     });
   } catch (err) {
     if (err instanceof Error) {
@@ -87,7 +103,7 @@ export async function POST(req: Request, context: RouteParams) {
       }
     }
 
-    console.error("[streak] POST error:", err);
+    console.error("[bookmarks] POST error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

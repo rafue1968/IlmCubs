@@ -1,120 +1,48 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/app/lib/prisma";
-import { getAuthenticatedUser } from "@/app/lib/auth/getAuthenticatedUser";
 import { requireUser } from "@/app/lib/auth/requireUser";
+import { requireOwnedChild } from "@/app/lib/auth/requireOwnedChild";
+import { deleteBookmark } from "@/app/lib/bookmarks-service";
+import { validateVerseInput } from "@/app/lib/quran-validation";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
-  try {
-    const user = await requireUser() //getAuthenticatedUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await req.json();
-    const { childId, surah, ayah, note } = body;
-
-    if (!childId || !surah || !ayah) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
-
-    // 🔐 ensure child belongs to user
-    const child = await prisma.child.findFirst({
-      where: {
-        id: childId,
-        userId: user.id,
-      },
-    });
-
-    if (!child) {
-      return NextResponse.json(
-        { error: "Child not found or not owned by user" },
-        { status: 403 }
-      );
-    }
-
-    const bookmark = await prisma.bookmark.upsert({
-      where: {
-        childId_surah_ayah: {
-          childId,
-          surah,
-          ayah,
-        },
-      },
-      update: {
-        note: note ?? null,
-      },
-      create: {
-        childId,
-        surah,
-        ayah,
-        note: note ?? null,
-      },
-    });
-
-    return NextResponse.json({ success: true, bookmark });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+interface RouteParams {
+  params: Promise<{ id: string; bookmarkId: string }>;
 }
 
-
-export async function DELETE(req: Request) {
+/**
+ * DELETE /api/children/[id]/bookmarks/[bookmarkId]
+ * Delete a bookmark
+ */
+export async function DELETE(req: Request, context: RouteParams) {
   try {
-    const user = await getAuthenticatedUser();
+    const { id: childId, bookmarkId } = await context.params;
+    const user = await requireUser();
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // Verify ownership of child
+    await requireOwnedChild(childId);
 
-    const { searchParams } = new URL(req.url);
-
-    const childId = searchParams.get("childId");
-    const surah = Number(searchParams.get("surah"));
-    const ayah = Number(searchParams.get("ayah"));
-
-    if (!childId || !surah || !ayah) {
+    if (!bookmarkId?.trim()) {
       return NextResponse.json(
-        { error: "Missing params" },
+        { error: "Bookmark ID is required" },
         { status: 400 }
       );
     }
 
-    // 🔐 ownership check
-    const child = await prisma.child.findFirst({
-      where: {
-        id: childId,
-        userId: user.id,
-      },
-    });
-
-    if (!child) {
-      return NextResponse.json(
-        { error: "Child not found or not owned" },
-        { status: 403 }
-      );
-    }
-
-    await prisma.bookmark.delete({
-      where: {
-        childId_surah_ayah: {
-          childId,
-          surah,
-          ayah,
-        },
-      },
-    });
+    await deleteBookmark(bookmarkId, childId);
 
     return NextResponse.json({ success: true });
   } catch (err) {
+    if (err instanceof Error) {
+      if (err.message === "Unauthorized") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (err.message === "Child not found") {
+        return NextResponse.json({ error: "Child not found" }, { status: 404 });
+      }
+    }
+
+    console.error("[bookmarks] DELETE error:", err);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

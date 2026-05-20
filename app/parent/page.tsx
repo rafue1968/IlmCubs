@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import ChildNavigation from "../components/ChildNavigation";
 import ParentProgressPanel from "../components/ParentProgressPanel";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function ParentPage() {
         >
           Back to home
         </Link>
+        <ChildNavigation />
         <ParentProgressPanel />
       </div>
     </main>

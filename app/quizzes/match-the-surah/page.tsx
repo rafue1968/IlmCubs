@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { BookmarkCheck, BookOpen, HeartHandshake, Puzzle, Sparkles, Volume2 } from "lucide-react";
 import { useProgress } from "@/lib/useProgress";
+import ChildNavigation from "../../components/ChildNavigation";
 
 type QuizChoice = {
   id: number;
@@ -316,7 +317,9 @@ export default function MatchTheSurahPage() {
           {bookmarkMessage}
         </div>
       ) : null}
-      <div className="mx-auto w-full max-w-xl">
+      <div className="mx-auto w-full max-w-4xl">
+        <ChildNavigation />
+        <div className="mx-auto w-full max-w-xl">
         <div className="mb-4 flex items-center justify-between gap-3">
           <Link
             href="/quizzes"
@@ -616,6 +619,7 @@ export default function MatchTheSurahPage() {
               </p>
             </div>
           ) : null}
+        </div>
         </div>
       </div>
     </main>

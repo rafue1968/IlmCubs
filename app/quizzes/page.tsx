@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ChildNavigation from "../components/ChildNavigation";
 
 function QuizCard(props: {
   title: string;
@@ -62,6 +63,7 @@ export default function QuizzesPage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-sky-200 via-emerald-100 to-yellow-100 px-5 py-10">
       <div className="mx-auto max-w-4xl">
+        <ChildNavigation />
         <div className="rounded-[34px] border-4 border-white/60 bg-white/35 p-7 shadow-[0_30px_70px_-45px_rgba(2,6,23,0.55)] backdrop-blur">
           <p className="text-sm font-black uppercase tracking-widest text-slate-700">
             Quizzes

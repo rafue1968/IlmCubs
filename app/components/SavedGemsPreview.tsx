@@ -1,18 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BookmarkCheck, Sparkles } from "lucide-react";
-import { type BookmarkItem, getBookmarks } from "@/lib/progress-storage";
+import { useProgress } from "@/lib/useProgress";
 
 export default function SavedGemsPreview() {
-  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setBookmarks(getBookmarks().slice().reverse().slice(0, 4));
-    });
-  }, []);
+  const { bookmarks } = useProgress();
+  const latestBookmarks = bookmarks.slice().reverse().slice(0, 4);
 
   return (
     <section className="mt-8 rounded-[36px] border-4 border-white/60 bg-white/35 p-6 shadow-[0_30px_70px_-45px_rgba(2,6,23,0.55)] backdrop-blur sm:p-8">
@@ -35,8 +29,8 @@ export default function SavedGemsPreview() {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {bookmarks.length > 0 ? (
-          bookmarks.map((bookmark, index) => (
+        {latestBookmarks.length > 0 ? (
+          latestBookmarks.map((bookmark, index) => (
             <div
               key={bookmark.id}
               className="ilm-pop rounded-[26px] border-4 border-white/60 bg-white/55 p-5 shadow-[0_18px_45px_-35px_rgba(2,6,23,0.45)]"

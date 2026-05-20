@@ -1,15 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookmarkCheck, BookOpen, HeartHandshake, Puzzle, Sparkles, Volume2 } from "lucide-react";
-import {
-  addBookmark,
-  addQuizHistory,
-  getBookmarks,
-  incrementStreak,
-  removeBookmark,
-} from "@/lib/progress-storage";
+import { useProgress } from "@/lib/useProgress";
 
 type QuizChoice = {
   id: number;
@@ -60,10 +54,9 @@ export default function MatchTheSurahPage() {
   const [quizState, setQuizState] = useState<QuizState>(createQuizState());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCurrentQuestionBookmarked, setIsCurrentQuestionBookmarked] =
-    useState(false);
   const [hasStartedQuiz, setHasStartedQuiz] = useState(false);
   const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
+  const { bookmarks, addBookmark, removeBookmark, completeQuiz } = useProgress();
 
   async function loadQuiz() {
     setIsLoading(true);
@@ -141,18 +134,13 @@ export default function MatchTheSurahPage() {
   const challengeOptions = currentQuestion
     ? getChallengeOptions(challengeKind, currentQuestion, questions)
     : [];
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setIsCurrentQuestionBookmarked(
-        currentQuestion
-          ? getBookmarks().some(
-              (bookmark) => bookmark.id === currentQuestion.verseKey
-            )
-          : false
-      );
-    });
-  }, [currentQuestion]);
+  const isCurrentQuestionBookmarked = useMemo(
+    () =>
+      currentQuestion
+        ? bookmarks.some((bookmark) => bookmark.id === currentQuestion.verseKey)
+        : false,
+    [bookmarks, currentQuestion]
+  );
 
   function handleChoice(choiceId: number) {
     if (!currentQuestion || quizState.selectedChoiceId !== null) {
@@ -174,8 +162,7 @@ export default function MatchTheSurahPage() {
     }
 
     if (quizState.currentIndex + 1 >= totalQuestions) {
-      incrementStreak();
-      addQuizHistory(quizState.score);
+      completeQuiz(quizState.score);
     }
 
     setQuizState((currentState) => ({
@@ -192,7 +179,6 @@ export default function MatchTheSurahPage() {
 
     if (isCurrentQuestionBookmarked) {
       removeBookmark(currentQuestion.verseKey);
-      setIsCurrentQuestionBookmarked(false);
       setBookmarkMessage("Removed from your saved gems");
       window.setTimeout(() => setBookmarkMessage(null), 1400);
       return;
@@ -204,7 +190,6 @@ export default function MatchTheSurahPage() {
       title: `${currentQuestion.verseKey} - ${currentQuestion.correctSurahName}`,
       timestamp: Date.now(),
     });
-    setIsCurrentQuestionBookmarked(true);
     setBookmarkMessage("Saved as a learning gem");
     window.setTimeout(() => setBookmarkMessage(null), 1400);
   }

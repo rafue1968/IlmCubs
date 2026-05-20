@@ -1,20 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { BarChart3, Bookmark, CalendarCheck, Flame, Sparkles } from "lucide-react";
-import {
-  type BookmarkItem,
-  type ProgressStore,
-  getProgressStore,
-  removeBookmark,
-} from "@/lib/progress-storage";
-
-const emptyProgress: ProgressStore = {
-  streak: 0,
-  lastActiveDate: "",
-  bookmarks: [],
-  quizHistory: [],
-};
+import { type BookmarkItem, useProgress } from "@/lib/useProgress";
 
 function formatDate(value: string) {
   if (!value) return "Not started";
@@ -32,25 +20,19 @@ function getAverageScore(scores: number[]) {
 }
 
 export default function ParentProgressPanel() {
-  const [progress, setProgress] = useState<ProgressStore>(emptyProgress);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      setProgress(getProgressStore());
-    });
-  }, []);
+  const { streak, lastActiveDate, bookmarks, quizHistory, removeBookmark } =
+    useProgress();
 
   const quizScores = useMemo(
-    () => progress.quizHistory.map((historyItem) => historyItem.score),
-    [progress.quizHistory]
+    () => quizHistory.map((historyItem) => historyItem.score),
+    [quizHistory]
   );
   const averageScore = getAverageScore(quizScores);
-  const latestBookmarks = progress.bookmarks.slice().reverse().slice(0, 6);
+  const latestBookmarks = bookmarks.slice().reverse().slice(0, 6);
   const streakMilestones = [1, 3, 7, 14, 30];
 
   function handleRemoveBookmark(bookmark: BookmarkItem) {
     removeBookmark(bookmark.id);
-    setProgress(getProgressStore());
   }
 
   return (
@@ -76,7 +58,7 @@ export default function ParentProgressPanel() {
               Current streak
             </p>
             <p className="mt-1 text-3xl font-extrabold text-slate-950">
-              {progress.streak}
+              {streak}
             </p>
           </div>
           <div className="rounded-[24px] border-4 border-white/60 bg-white/50 p-5">
@@ -85,7 +67,7 @@ export default function ParentProgressPanel() {
               Last active
             </p>
             <p className="mt-1 text-2xl font-extrabold text-slate-950">
-              {formatDate(progress.lastActiveDate)}
+              {formatDate(lastActiveDate)}
             </p>
           </div>
           <div className="rounded-[24px] border-4 border-white/60 bg-white/50 p-5">
@@ -94,7 +76,7 @@ export default function ParentProgressPanel() {
               Bookmarks
             </p>
             <p className="mt-1 text-3xl font-extrabold text-slate-950">
-              {progress.bookmarks.length}
+              {bookmarks.length}
             </p>
           </div>
           <div className="rounded-[24px] border-4 border-white/60 bg-white/50 p-5">
@@ -114,7 +96,7 @@ export default function ParentProgressPanel() {
           </p>
           <div className="mt-4 grid grid-cols-5 gap-2">
             {streakMilestones.map((milestone) => {
-              const isUnlocked = progress.streak >= milestone;
+              const isUnlocked = streak >= milestone;
 
               return (
                 <div

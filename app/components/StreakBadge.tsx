@@ -1,20 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Flame, Sparkles } from "lucide-react";
-import { getStreak, incrementStreak } from "@/lib/progress-storage";
+import { useProgress } from "@/lib/useProgress";
 
 export default function StreakBadge() {
-  const [streak, setStreak] = useState(0);
-  const [hasHydrated, setHasHydrated] = useState(false);
+  const { streak, isHydrated, checkDailyStreak } = useProgress();
+  const hasCheckedDailyStreakRef = useRef(false);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      const nextStreak = incrementStreak();
-      setStreak(nextStreak || getStreak());
-      setHasHydrated(true);
-    });
-  }, []);
+    if (!isHydrated || hasCheckedDailyStreakRef.current) {
+      return;
+    }
+
+    hasCheckedDailyStreakRef.current = true;
+    checkDailyStreak();
+  }, [checkDailyStreak, isHydrated]);
 
   const nextMilestone = Math.max(3, Math.ceil((streak + 1) / 3) * 3);
   const progress = nextMilestone > 0 ? Math.min((streak / nextMilestone) * 100, 100) : 0;
@@ -23,7 +24,7 @@ export default function StreakBadge() {
     <div
       className={[
         "inline-flex min-w-[210px] items-center gap-3 rounded-full bg-white/70 px-4 py-2 text-sm font-bold text-slate-700 ring-2 ring-white/80",
-        hasHydrated ? "ilm-pop" : "",
+        isHydrated ? "ilm-pop" : "",
       ].join(" ")}
     >
       <span className="ilm-pulse-ring flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-100">

@@ -12,11 +12,7 @@ import {
 } from "lucide-react";
 import { completeActivity } from "../lib/user-api";
 import { useCallback, useState, useEffect, useRef } from "react";
-import {
-  addBookmark,
-  getBookmarks,
-  removeBookmark,
-} from "@/lib/progress-storage";
+import { useProgress } from "@/lib/useProgress";
 
 interface Question {
   question: string;
@@ -66,7 +62,6 @@ export default function StoryTime() {
   const [score, setScore] = useState(0);
   const askedQuestionsRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [bookmarkedStoryIds, setBookmarkedStoryIds] = useState<string[]>([]);
   const [storyCard, setStoryCard] = useState<StoryCard | null>(null);
   const [storyCardLoading, setStoryCardLoading] = useState(false);
   const [selectedStoryOption, setSelectedStoryOption] = useState<number | null>(null);
@@ -75,6 +70,7 @@ export default function StoryTime() {
   const [questionStyle, setQuestionStyle] = useState<QuestionStyle>("meaning");
   const [celebrationText, setCelebrationText] = useState<string | null>(null);
   const [bookmarkMessage, setBookmarkMessage] = useState<string | null>(null);
+  const { bookmarks, addBookmark, removeBookmark, completeQuiz } = useProgress();
 
 
   const generateQuestions = useCallback(async () => {
@@ -158,16 +154,6 @@ export default function StoryTime() {
 
 
   useEffect(() => {
-    queueMicrotask(() => {
-      setBookmarkedStoryIds(
-        getBookmarks()
-          .filter((bookmark) => bookmark.type === "story")
-          .map((bookmark) => bookmark.id)
-      );
-    });
-  }, []);
-
-  useEffect(() => {
     if (selectedStory) {
       queueMicrotask(() => {
         void generateStoryCard();
@@ -179,16 +165,13 @@ export default function StoryTime() {
   const getStoryId = (story: StoryConfig) => `story:${story.surah}`;
 
   const isStoryBookmarked = (story: StoryConfig) =>
-    bookmarkedStoryIds.includes(getStoryId(story));
+    bookmarks.some((bookmark) => bookmark.id === getStoryId(story));
 
   const toggleStoryBookmark = (story: StoryConfig) => {
     const storyId = getStoryId(story);
 
-    if (bookmarkedStoryIds.includes(storyId)) {
+    if (isStoryBookmarked(story)) {
       removeBookmark(storyId);
-      setBookmarkedStoryIds((currentIds) =>
-        currentIds.filter((currentId) => currentId !== storyId)
-      );
       setBookmarkMessage("Removed from saved stories");
       window.setTimeout(() => setBookmarkMessage(null), 1400);
       return;
@@ -200,7 +183,6 @@ export default function StoryTime() {
       title: story.name,
       timestamp: Date.now(),
     });
-    setBookmarkedStoryIds((currentIds) => [...currentIds, storyId]);
     setBookmarkMessage("Story saved to your collection");
     window.setTimeout(() => setBookmarkMessage(null), 1400);
   };
@@ -250,6 +232,7 @@ export default function StoryTime() {
     } else {
       // Record quiz completion
       try {
+        completeQuiz(score);
         await completeActivity("quiz_completion", {
           story: selectedStory?.name,
           score,

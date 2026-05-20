@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BookOpen, CheckCircle2, Flame, HeartHandshake, Sparkles, Volume2 } from "lucide-react";
-import { incrementStreak } from "@/lib/progress-storage";
-
-const TASK_STORAGE_KEY = "ilmcubs_daily_tasks";
+import { useProgress } from "@/lib/useProgress";
 
 type DailyTask = {
   id: string;
@@ -38,64 +36,25 @@ const dailyTasks: DailyTask[] = [
   },
 ];
 
-function getTodayDate() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function getIcon(icon: DailyTask["icon"]) {
   if (icon === "kindness") return HeartHandshake;
   if (icon === "listen") return Volume2;
   return BookOpen;
 }
 
-function getCompletedTasks() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const rawValue = window.localStorage.getItem(TASK_STORAGE_KEY);
-    if (!rawValue) return [];
-
-    const parsed = JSON.parse(rawValue) as { date?: string; completed?: string[] };
-    return parsed.date === getTodayDate() && Array.isArray(parsed.completed)
-      ? parsed.completed
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCompletedTasks(completed: string[]) {
-  window.localStorage.setItem(
-    TASK_STORAGE_KEY,
-    JSON.stringify({
-      date: getTodayDate(),
-      completed,
-    })
-  );
-}
-
 export default function DailyTasks() {
-  const [completedTaskIds, setCompletedTaskIds] = useState<string[]>([]);
+  const { completedDailyTaskIds, completeDailyTask } = useProgress();
   const [justCompletedTaskId, setJustCompletedTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    queueMicrotask(() => {
-      setCompletedTaskIds(getCompletedTasks());
-    });
-  }, []);
-
   function handleComplete(taskId: string) {
-    if (completedTaskIds.includes(taskId)) return;
+    if (completedDailyTaskIds.includes(taskId)) return;
 
-    const nextCompletedTaskIds = [...completedTaskIds, taskId];
-    saveCompletedTasks(nextCompletedTaskIds);
-    incrementStreak();
-    setCompletedTaskIds(nextCompletedTaskIds);
+    completeDailyTask(taskId);
     setJustCompletedTaskId(taskId);
     window.setTimeout(() => setJustCompletedTaskId(null), 1600);
   }
 
-  const completedCount = completedTaskIds.length;
+  const completedCount = completedDailyTaskIds.length;
   const progressPercent = Math.round((completedCount / dailyTasks.length) * 100);
 
   return (
@@ -127,7 +86,7 @@ export default function DailyTasks() {
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {dailyTasks.map((task) => {
           const Icon = getIcon(task.icon);
-          const isComplete = completedTaskIds.includes(task.id);
+          const isComplete = completedDailyTaskIds.includes(task.id);
 
           return (
             <div

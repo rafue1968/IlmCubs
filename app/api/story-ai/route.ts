@@ -16,6 +16,16 @@ type GeminiStoryResponse = {
   incorrectOption: string;
 };
 
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
 const GEMINI_MODEL = "gemini-2.5-flash";
 
 function fallbackStory(juzNumber: number): StoryItem {
@@ -111,7 +121,8 @@ Schema:
     throw new Error("Gemini story request failed");
   }
 
-  const raw = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const envelope = data as GeminiGenerateContentResponse;
+  const raw = envelope.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   if (!raw) {
     throw new Error("Gemini returned no story text");
   }

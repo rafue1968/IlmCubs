@@ -14,12 +14,26 @@ type GeminiQuizQuestion = {
   explanation: string;
 };
 
+type GeminiGenerateContentResponse = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+};
+
 const GEMINI_MODEL = "gemini-2.5-flash";
 
-function buildFallbackQuestions(surah: string, topic: string): QuizQuestion[] {
+function buildFallbackQuestions(
+  surah: string,
+  topic: string,
+  difficulty: string
+): QuizQuestion[] {
   return [
     {
-      question: `What does the story of ${surah} teach us?`,
+      question: `What does ${surah} teach us?`,
       options: [
         "Trust Allah and do good",
         "Be mean to others",
@@ -30,7 +44,10 @@ function buildFallbackQuestions(surah: string, topic: string): QuizQuestion[] {
       explanation: `${surah} teaches us to trust Allah and choose what is good.`,
     },
     {
-      question: `Which action matches the lesson from ${topic}?`,
+      question:
+        difficulty === "challenge"
+          ? `Which action best matches the lesson from ${topic}?`
+          : `Which action matches the lesson?`,
       options: [
         "Helping others",
         "Hurting others",
@@ -80,6 +97,8 @@ async function generateQuizWithGemini(
   surah: string,
   topic: string,
   previousQuestions: string[],
+  difficulty: string,
+  questionStyle: string,
   geminiKey: string
 ): Promise<QuizQuestion[]> {
   const prompt = `
@@ -92,6 +111,10 @@ Rules:
 - Keep language very simple.
 - Use short sentences.
 - Make questions friendly and easy for little children.
+- Difficulty level: ${difficulty}. For "easy", ask recall questions. For "guided", ask meaning/action questions. For "challenge", ask gentle real-life application questions.
+- Question style: ${questionStyle}. Keep every question age-appropriate and cheerful.
+- Focus on meanings, kindness, gratitude, patience, trust in Allah, and everyday good actions.
+- Avoid complex law, conflict, punishment details, adult themes, fear-based wording, or graphic content.
 - Avoid repeating any of these previous questions:
 ${previousQuestions.length ? previousQuestions.join(" | ") : "None"}
 
@@ -157,7 +180,8 @@ Schema:
     throw new Error("Gemini quiz request failed");
   }
 
-  const raw = (data as any)?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const envelope = data as GeminiGenerateContentResponse;
+  const raw = envelope.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   if (!raw) {
     throw new Error("Gemini returned no quiz text");
   }
@@ -180,7 +204,13 @@ Schema:
 
 export async function POST(req: Request) {
   try {
-    const { surah, topic, previousQuestions = [] } = await req.json();
+    const {
+      surah,
+      topic,
+      previousQuestions = [],
+      difficulty = "easy",
+      questionStyle = "meaning",
+    } = await req.json();
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) {
@@ -202,6 +232,8 @@ export async function POST(req: Request) {
         surah,
         topic,
         Array.isArray(previousQuestions) ? previousQuestions : [],
+        typeof difficulty === "string" ? difficulty : "easy",
+        typeof questionStyle === "string" ? questionStyle : "meaning",
         geminiKey
       );
 
@@ -218,7 +250,11 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         success: true,
-        questions: buildFallbackQuestions(surah, topic),
+        questions: buildFallbackQuestions(
+          surah,
+          topic,
+          typeof difficulty === "string" ? difficulty : "easy"
+        ),
         fallback: true,
       });
     }

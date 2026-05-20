@@ -1,6 +1,15 @@
 "use client";
 
-import { Bookmark, CheckCircle, Loader2, RotateCcw, XCircle } from "lucide-react";
+import {
+  Bookmark,
+  CheckCircle,
+  Loader2,
+  RotateCcw,
+  Sparkles,
+  Volume2,
+  WandSparkles,
+  XCircle,
+} from "lucide-react";
 import { completeActivity } from "../lib/user-api";
 import { useCallback, useState, useEffect, useRef } from "react";
 import {
@@ -20,12 +29,24 @@ interface StoryConfig {
   surah: string;
   topic: string;
   name: string;
+  juz: number;
 }
 
 const STORIES: StoryConfig[] = [
-  { surah: "Al-Fil", topic: "Elephant and the Kaaba", name: "The Elephant" },
-  { surah: "Quraysh", topic: "Trade and protection", name: "Quraysh Tribe" },
+  { surah: "Al-Fil", topic: "Elephant and the Kaaba", name: "The Elephant", juz: 30 },
+  { surah: "Quraysh", topic: "Trade and protection", name: "Quraysh Tribe", juz: 30 },
 ];
+
+type StoryCard = {
+  juzNumber: number;
+  title: string;
+  story: string;
+  verse: string;
+  options: { label: string; correct: boolean }[];
+};
+
+type Difficulty = "easy" | "guided" | "challenge";
+type QuestionStyle = "meaning" | "kindness" | "daily-action";
 
 export default function StoryTime() {
   const [selectedStory, setSelectedStory] = useState<StoryConfig | null>(null);
@@ -38,6 +59,13 @@ export default function StoryTime() {
   const askedQuestionsRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [bookmarkedStoryIds, setBookmarkedStoryIds] = useState<string[]>([]);
+  const [storyCard, setStoryCard] = useState<StoryCard | null>(null);
+  const [storyCardLoading, setStoryCardLoading] = useState(false);
+  const [selectedStoryOption, setSelectedStoryOption] = useState<number | null>(null);
+  const [learningComplete, setLearningComplete] = useState(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [questionStyle, setQuestionStyle] = useState<QuestionStyle>("meaning");
+  const [celebrationText, setCelebrationText] = useState<string | null>(null);
 
 
   const generateQuestions = useCallback(async () => {
@@ -54,6 +82,8 @@ export default function StoryTime() {
           surah: selectedStory.surah,
           topic: selectedStory.topic,
           previousQuestions: askedQuestionsRef.current,
+          difficulty,
+          questionStyle,
         }),
       });
 
@@ -84,6 +114,37 @@ export default function StoryTime() {
     } finally {
       setLoading(false);
     }
+  }, [difficulty, questionStyle, selectedStory]);
+
+  const generateStoryCard = useCallback(async () => {
+    if (!selectedStory) return;
+
+    setStoryCardLoading(true);
+    setError(null);
+    setStoryCard(null);
+    setSelectedStoryOption(null);
+    setLearningComplete(false);
+
+    try {
+      const response = await fetch(`/api/story-ai?juz=${selectedStory.juz}`);
+      const data = (await response.json()) as {
+        success: boolean;
+        story?: StoryCard;
+        error?: string;
+      };
+
+      if (!data.success || !data.story) {
+        throw new Error(data.error || "Failed to generate story card");
+      }
+
+      setStoryCard(data.story);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setError(errorMessage);
+      console.error("Error generating story card:", err);
+    } finally {
+      setStoryCardLoading(false);
+    }
   }, [selectedStory]);
 
 
@@ -100,10 +161,11 @@ export default function StoryTime() {
   useEffect(() => {
     if (selectedStory) {
       queueMicrotask(() => {
+        void generateStoryCard();
         void generateQuestions();
       });
     }
-  }, [generateQuestions, selectedStory]);
+  }, [generateQuestions, generateStoryCard, selectedStory]);
 
   const getStoryId = (story: StoryConfig) => `story:${story.surah}`;
 
@@ -138,7 +200,33 @@ export default function StoryTime() {
 
     if (index === questions[currentQuestionIndex].correctAnswer) {
       setScore(score + 1);
+      setCelebrationText("Lovely choice!");
+      window.setTimeout(() => setCelebrationText(null), 1400);
     }
+  };
+
+  const handleStoryOption = (index: number) => {
+    if (!storyCard) return;
+
+    setSelectedStoryOption(index);
+
+    if (storyCard.options[index]?.correct) {
+      setLearningComplete(true);
+      setCelebrationText("Kind action unlocked!");
+      window.setTimeout(() => setCelebrationText(null), 1400);
+    }
+  };
+
+  const handleSpeak = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.84;
+    utterance.pitch = 1.08;
+    window.speechSynthesis.speak(utterance);
   };
 
   const handleNext = async () => {
@@ -160,6 +248,13 @@ export default function StoryTime() {
       }
 
       // Generate more questions when quiz is done
+      const nextDifficulty: Difficulty =
+        score >= questions.length - 1
+          ? "challenge"
+          : score >= Math.ceil(questions.length / 2)
+            ? "guided"
+            : "easy";
+      setDifficulty(nextDifficulty);
       setCurrentQuestionIndex(0);
       setScore(0); // Reset score for new quiz
       generateQuestions();
@@ -175,6 +270,11 @@ export default function StoryTime() {
     setScore(0);
     askedQuestionsRef.current = [];
     setError(null);
+    setStoryCard(null);
+    setSelectedStoryOption(null);
+    setLearningComplete(false);
+    setDifficulty("easy");
+    setQuestionStyle("meaning");
   };
 
   if (!selectedStory) {
@@ -209,11 +309,11 @@ export default function StoryTime() {
     );
   }
 
-  if (loading) {
+  if (loading || storyCardLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-4">
         <Loader2 className="h-8 w-8 text-blue-500 animate-spin" />
-        <p className="text-slate-600">Generating questions...</p>
+        <p className="text-slate-600">Gemini is making your story adventure...</p>
       </div>
     );
   }
@@ -248,14 +348,125 @@ export default function StoryTime() {
 
   const currentQuestion = questions[currentQuestionIndex];
 
+  if (!learningComplete) {
+    const activeStoryCard =
+      storyCard ||
+      ({
+        juzNumber: selectedStory.juz,
+        title: selectedStory.name,
+        story: `Let us learn about ${selectedStory.topic} with kind hearts.`,
+        verse: "The Quran guides us to choose what is good.",
+        options: [
+          { label: "Choose the kind action", correct: true },
+          { label: "Choose the unkind action", correct: false },
+        ],
+      } satisfies StoryCard);
+
+    return (
+      <div className="space-y-6">
+        {celebrationText ? (
+          <div className="fixed left-1/2 top-8 z-50 -translate-x-1/2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg">
+            {celebrationText}
+          </div>
+        ) : null}
+
+        <div className="rounded-[28px] border-4 border-white bg-white/80 p-6 shadow-lg">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-blue-600">
+                Learn first
+              </p>
+              <h1 className="mt-2 text-3xl font-extrabold text-slate-950">
+                {activeStoryCard.title}
+              </h1>
+            </div>
+            <Sparkles className="h-8 w-8 text-yellow-500" aria-hidden="true" />
+          </div>
+
+          <p className="mt-5 rounded-2xl bg-blue-50 p-4 text-lg font-bold leading-8 text-blue-950">
+            {activeStoryCard.story}
+          </p>
+          <p className="mt-4 rounded-2xl bg-emerald-50 p-4 text-base font-extrabold leading-7 text-emerald-900">
+            {activeStoryCard.verse}
+          </p>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                handleSpeak(`${activeStoryCard.title}. ${activeStoryCard.story}. ${activeStoryCard.verse}`)
+              }
+              className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-extrabold text-slate-900 ring-2 ring-blue-100 transition hover:bg-blue-50"
+            >
+              <Volume2 className="h-4 w-4" aria-hidden="true" />
+              Listen
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void generateStoryCard();
+                void generateQuestions();
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-extrabold text-slate-900 ring-2 ring-blue-100 transition hover:bg-blue-50"
+            >
+              <WandSparkles className="h-4 w-4" aria-hidden="true" />
+              New AI card
+            </button>
+          </div>
+
+          <div className="mt-6">
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-600">
+              What should we do?
+            </p>
+            <div className="mt-3 grid gap-3">
+              {activeStoryCard.options.map((option, index) => {
+                const isSelected = selectedStoryOption === index;
+                const isCorrect = option.correct;
+
+                return (
+                  <button
+                    key={option.label}
+                    type="button"
+                    onClick={() => handleStoryOption(index)}
+                    className={[
+                      "rounded-2xl border-2 p-4 text-left text-base font-extrabold transition",
+                      selectedStoryOption === null
+                        ? "border-blue-100 bg-white text-slate-900 hover:border-blue-300"
+                        : isCorrect
+                          ? "border-emerald-400 bg-emerald-50 text-emerald-900"
+                          : isSelected
+                            ? "border-rose-300 bg-rose-50 text-rose-900"
+                            : "border-slate-200 bg-slate-50 text-slate-500",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {celebrationText ? (
+        <div className="fixed left-1/2 top-8 z-50 -translate-x-1/2 rounded-full bg-emerald-500 px-6 py-3 text-sm font-black text-white shadow-lg">
+          {celebrationText}
+        </div>
+      ) : null}
       <div className="bg-blue-50 rounded-2xl p-4 flex justify-between items-center gap-4">
         <div>
           <p className="text-sm text-blue-600 font-medium">
             {selectedStory.name}
           </p>
           <p className="text-2xl font-bold text-blue-900">Score: {score}</p>
+          <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-blue-500">
+            {difficulty} · {questionStyle.replace("-", " ")}
+          </p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           <button
@@ -272,6 +483,48 @@ export default function StoryTime() {
             <RotateCcw className="h-4 w-4" />
             New Story
           </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border-2 border-blue-100 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-600">
+            AI question style
+          </p>
+          <button
+            type="button"
+            onClick={() => handleSpeak(currentQuestion.question)}
+            className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-800 transition hover:bg-blue-100"
+          >
+            <Volume2 className="h-4 w-4" aria-hidden="true" />
+            Read question
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {[
+            { id: "meaning", label: "Meaning" },
+            { id: "kindness", label: "Kindness" },
+            { id: "daily-action", label: "Daily action" },
+          ].map((style) => (
+            <button
+              key={style.id}
+              type="button"
+              onClick={() => {
+                setQuestionStyle(style.id as QuestionStyle);
+                askedQuestionsRef.current = [];
+                void generateQuestions();
+              }}
+              className={[
+                "rounded-full px-3 py-2 text-xs font-extrabold transition",
+                questionStyle === style.id
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+              ].join(" ")}
+            >
+              {style.label}
+            </button>
+          ))}
         </div>
       </div>
 

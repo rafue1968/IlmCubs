@@ -2,6 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  addBookmark,
+  addQuizHistory,
+  getBookmarks,
+  incrementStreak,
+  removeBookmark,
+} from "@/lib/progress-storage";
 
 type QuizChoice = {
   id: number;
@@ -44,6 +51,8 @@ export default function MatchTheSurahPage() {
   const [quizState, setQuizState] = useState<QuizState>(createQuizState());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCurrentQuestionBookmarked, setIsCurrentQuestionBookmarked] =
+    useState(false);
 
   async function loadQuiz() {
     setIsLoading(true);
@@ -109,6 +118,18 @@ export default function MatchTheSurahPage() {
       ? Math.min((quizState.currentIndex / totalQuestions) * 100, 100)
       : 0;
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      setIsCurrentQuestionBookmarked(
+        currentQuestion
+          ? getBookmarks().some(
+              (bookmark) => bookmark.id === currentQuestion.verseKey
+            )
+          : false
+      );
+    });
+  }, [currentQuestion]);
+
   function handleChoice(choiceId: number) {
     if (!currentQuestion || quizState.selectedChoiceId !== null) {
       return;
@@ -128,11 +149,36 @@ export default function MatchTheSurahPage() {
       return;
     }
 
+    if (quizState.currentIndex + 1 >= totalQuestions) {
+      incrementStreak();
+      addQuizHistory(quizState.score);
+    }
+
     setQuizState((currentState) => ({
       ...currentState,
       currentIndex: currentState.currentIndex + 1,
       selectedChoiceId: null,
     }));
+  }
+
+  function handleToggleBookmark() {
+    if (!currentQuestion) {
+      return;
+    }
+
+    if (isCurrentQuestionBookmarked) {
+      removeBookmark(currentQuestion.verseKey);
+      setIsCurrentQuestionBookmarked(false);
+      return;
+    }
+
+    addBookmark({
+      type: "verse",
+      id: currentQuestion.verseKey,
+      title: `${currentQuestion.verseKey} - ${currentQuestion.correctSurahName}`,
+      timestamp: Date.now(),
+    });
+    setIsCurrentQuestionBookmarked(true);
   }
 
   return (
@@ -248,9 +294,18 @@ export default function MatchTheSurahPage() {
                   <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-900/70">
                     Round {quizState.currentIndex + 1} of {totalQuestions}
                   </p>
-                  <p className="rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold text-emerald-900 ring-1 ring-emerald-200">
-                    {currentQuestion.verseKey}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="rounded-full bg-white/70 px-3 py-1 text-xs font-extrabold text-emerald-900 ring-1 ring-emerald-200">
+                      {currentQuestion.verseKey}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleToggleBookmark}
+                      className="rounded-full bg-white/80 px-3 py-1 text-xs font-extrabold text-emerald-900 ring-1 ring-emerald-200 transition hover:bg-white"
+                    >
+                      {isCurrentQuestionBookmarked ? "Saved" : "Save"}
+                    </button>
+                  </div>
                 </div>
 
                 <p className="mt-4 text-center text-2xl font-bold leading-relaxed text-emerald-950 [font-family:var(--font-geist-sans)] sm:text-3xl">

@@ -1,8 +1,13 @@
 "use client";
 
-import { CheckCircle, Loader2, RotateCcw, XCircle } from "lucide-react";
+import { Bookmark, CheckCircle, Loader2, RotateCcw, XCircle } from "lucide-react";
 import { completeActivity } from "../lib/user-api";
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import {
+  addBookmark,
+  getBookmarks,
+  removeBookmark,
+} from "@/lib/progress-storage";
 
 interface Question {
   question: string;
@@ -30,11 +35,12 @@ export default function StoryTime() {
   const [answered, setAnswered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState(0);
-  const [askedQuestions, setAskedQuestions] = useState<string[]>([]);
+  const askedQuestionsRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [bookmarkedStoryIds, setBookmarkedStoryIds] = useState<string[]>([]);
 
 
-  const generateQuestions = async () => {
+  const generateQuestions = useCallback(async () => {
     if (!selectedStory) return;
 
     setLoading(true);
@@ -47,7 +53,7 @@ export default function StoryTime() {
         body: JSON.stringify({
           surah: selectedStory.surah,
           topic: selectedStory.topic,
-          previousQuestions: askedQuestions,
+          previousQuestions: askedQuestionsRef.current,
         }),
       });
 
@@ -67,10 +73,10 @@ export default function StoryTime() {
       setAnswered(false);
 
       // Track asked questions to avoid repetition
-      setAskedQuestions([
-        ...askedQuestions,
+      askedQuestionsRef.current = [
+        ...askedQuestionsRef.current,
         ...data.questions.map((q) => q.question),
-      ]);
+      ];
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       setError(errorMessage);
@@ -78,14 +84,51 @@ export default function StoryTime() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStory]);
 
 
   useEffect(() => {
+    queueMicrotask(() => {
+      setBookmarkedStoryIds(
+        getBookmarks()
+          .filter((bookmark) => bookmark.type === "story")
+          .map((bookmark) => bookmark.id)
+      );
+    });
+  }, []);
+
+  useEffect(() => {
     if (selectedStory) {
-      generateQuestions();
+      queueMicrotask(() => {
+        void generateQuestions();
+      });
     }
-  }, [selectedStory]);
+  }, [generateQuestions, selectedStory]);
+
+  const getStoryId = (story: StoryConfig) => `story:${story.surah}`;
+
+  const isStoryBookmarked = (story: StoryConfig) =>
+    bookmarkedStoryIds.includes(getStoryId(story));
+
+  const toggleStoryBookmark = (story: StoryConfig) => {
+    const storyId = getStoryId(story);
+
+    if (bookmarkedStoryIds.includes(storyId)) {
+      removeBookmark(storyId);
+      setBookmarkedStoryIds((currentIds) =>
+        currentIds.filter((currentId) => currentId !== storyId)
+      );
+      return;
+    }
+
+    addBookmark({
+      type: "story",
+      id: storyId,
+      title: story.name,
+      timestamp: Date.now(),
+    });
+    setBookmarkedStoryIds((currentIds) => [...currentIds, storyId]);
+  };
 
   const handleAnswer = (index: number) => {
     if (answered) return;
@@ -130,7 +173,7 @@ export default function StoryTime() {
     setSelectedAnswer(null);
     setAnswered(false);
     setScore(0);
-    setAskedQuestions([]);
+    askedQuestionsRef.current = [];
     setError(null);
   };
 
@@ -155,6 +198,10 @@ export default function StoryTime() {
             >
               <h2 className="text-xl font-bold text-slate-900">{story.name}</h2>
               <p className="text-sm text-slate-600 mt-1">{story.topic}</p>
+              <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                <Bookmark className="h-3.5 w-3.5" aria-hidden="true" />
+                {isStoryBookmarked(story) ? "Saved" : "Open to save"}
+              </span>
             </button>
           ))}
         </div>
@@ -203,20 +250,29 @@ export default function StoryTime() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-blue-50 rounded-2xl p-4 flex justify-between items-center">
+      <div className="bg-blue-50 rounded-2xl p-4 flex justify-between items-center gap-4">
         <div>
           <p className="text-sm text-blue-600 font-medium">
             {selectedStory.name}
           </p>
           <p className="text-2xl font-bold text-blue-900">Score: {score}</p>
         </div>
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
-        >
-          <RotateCcw className="h-4 w-4" />
-          New Story
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            onClick={() => toggleStoryBookmark(selectedStory)}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-blue-700 rounded-lg hover:bg-blue-100 transition"
+          >
+            <Bookmark className="h-4 w-4" aria-hidden="true" />
+            {isStoryBookmarked(selectedStory) ? "Saved" : "Save"}
+          </button>
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+          >
+            <RotateCcw className="h-4 w-4" />
+            New Story
+          </button>
+        </div>
       </div>
 
       <div className="bg-white border-2 border-blue-200 rounded-2xl p-6 space-y-6">

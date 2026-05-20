@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import LoginButton from "./components/LoginButton";
+import StreakBadge from "./components/StreakBadge";
 import {
   getQuranOAuthProfile,
   type QuranOAuthProfile,
@@ -203,6 +204,7 @@ export default function HomePage() {
                 <span className="rounded-full bg-white/60 px-4 py-2 text-sm font-bold text-slate-700 ring-2 ring-white/70">
                   Short & playful
                 </span>
+                <StreakBadge />
               </div>
             </div>
 
